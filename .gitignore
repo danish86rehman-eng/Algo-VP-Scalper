@@ -1,0 +1,31 @@
+# Credentials — never commit
+.env
+apex_ai/.env
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime artefacts
+apex_ai/logs/
+*.log
+apex_ai/data/*.db
+apex_ai/data/*.db-shm
+apex_ai/data/*.db-wal
+
+# Backtest outputs
+apex_ai/backtest_results*.json
+apex_ai/history_*.md
+
+# OS
+.DS_Store
+Thumbs.db

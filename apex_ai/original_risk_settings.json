@@ -1,0 +1,12 @@
+{
+  "risk_note": "These are the original institutional risk parameters. Revert config.json to these values once the account balance is increased.",
+  "risk": {
+    "high_clarity_risk_pct":   2.0,
+    "medium_clarity_risk_pct": 1.0,
+    "low_clarity_risk_pct":    0.0,
+    "max_total_exposure_pct":  6.0,
+    "max_positions":           4,
+    "max_drawdown_pct":        10.0,
+    "min_rr_ratio":            2.0
+  }
+}

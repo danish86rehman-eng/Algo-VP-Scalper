@@ -1,0 +1,2 @@
+cd apex_ai
+python scalper_agent.py --pool 500 --risk 0.02 --symbols USOIL,XAUUSD,XAGUSD --interval 30 --loss-limit 50.0

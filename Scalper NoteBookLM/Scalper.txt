@@ -1,0 +1,47 @@
+```markdown
+# Project: Python XAUUSD Scalping Bot via MT5 Integration
+**Platform:** Python 3.x with `MetaTrader5` library
+**Asset:** Gold (XAUUSD)
+**Strategy Profile:** Low-latency scalping, multi-timeframe analysis, and AI-driven volatility filtering.
+**Core Objective:** Capitalize on XAUUSD's high daily volatility (500-2,000 pips) while prioritizing strict capital preservation through external Python logic.
+
+## 1. Tech Stack & Architecture
+*   **Data Pipeline:** Use the `MetaTrader5` Python package to pull high-quality Tick Data and M1/M5 candlesticks directly from the MT5 terminal. 
+*   **Execution Engine:** Python script sends instant Buy/Sell orders via MT5 with pre-calculated Stop Loss (SL) and Take Profit (TP) parameters.
+*   **AI Integration:** Python handles JSON data formatting and asynchronous HTTPS requests to APIs like OpenAI to evaluate market conditions and generate probabilistic trade recommendations.
+
+## 2. Core Trading Strategies (Python Logic)
+The script should incorporate modular strategy logic, allowing the user to run the following proven gold scalping approaches:
+
+### A. Open Range Breakout (ORB) Strategy (H1)
+*   **Logic:** Identifies the initial high and low of the first candle after the market opens (typically 1:02 server time).
+*   **Execution:** Waits for 3 confirming candles within this range before entering on a breakout (Buy) or breakdown (Sell). 
+*   **Targets:** 1200-pip Take Profit (TP) and 400-pip Stop Loss (SL).
+
+### B. Moving Average Crossover Scalper (M5)
+*   **Logic:** Executes quick momentum trades based on a fast MA (e.g., 3-period) crossing a slow MA (e.g., 8-period).
+*   **Trend Filter:** Incorporates an EMA 200 to ensure trades are only taken in the direction of the broader trend.
+*   **Targets:** Fixed 10-pip TP, exiting if an opposite crossover occurs.
+
+### C. Mean Reversion via RSI (M15)
+*   **Logic:** Utilizes the Relative Strength Index (RSI) to capture mean-reverting momentum swings, buying when RSI dips below 30 and selling when it spikes above 70.
+*   **Confirmation:** Validates entries by checking for specific candlestick patterns (e.g., engulfing patterns) closing in alignment with the RSI.
+
+## 3. Mandatory Risk Management Architecture
+Gold can move 100-200 pips within seconds, reacting instantly to liquidity shifts and news. The Python bot must enforce these safety constraints before routing any order to MT5:
+*   **Hard Stop Loss:** Every trade must have a fixed SL sent to the broker. Mental or hidden stops managed by the Python script are prohibited to prevent disaster during connection drops.
+*   **No Toxic Logic:** The bot must strictly prohibit **Grid** and **Martingale** recovery systems, which risk total account liquidation during prolonged gold trends.
+*   **Pre-Trade Filters:** The Python script must verify that the spread is within a safe threshold before execution, as spreads widen dramatically during volatile session overlaps.
+*   **Layered Take Profit:** Implement a triple-TP structure in Python (e.g., closing 40% volume at TP1, 30% at TP2, 30% at TP3) to secure partial profits early and hedge against sudden reversals.
+
+
+## 4. Claude Prompt Template for Python/MT5 Generation
+*Use the following prompt framework when generating the Python scripts for this bot:*
+
+> "Write a Python script using the `MetaTrader5` library that trades XAUUSD on the M5 timeframe. 
+> **Data Retrieval:** Pull live tick data and the latest M5 candles.
+> **Entry Logic:** Buy when the 3-period MA crosses above the 8-period MA, and sell when it crosses below. Ensure the trade is in the direction of the 200-period EMA.
+> **Risk Management:** Calculate and send a fixed Stop Loss of 50 points and a Take Profit of 100 points with the MT5 order request. Include a pre-trade check that blocks the order if the current spread exceeds [X] points. Strictly DO NOT use Martingale or Grid logic.
+> **Execution:** Ensure robust error handling for the MT5 connection and order execution responses."
+
+```

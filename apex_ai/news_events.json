@@ -1,0 +1,131 @@
+[
+  {
+    "time_utc": "2026-08-26T01:30:00Z",
+    "impact": "HIGH",
+    "title": "AUD CPI m/m",
+    "symbols": [
+      "AUDUSD",
+      "EURAUD",
+      "AUDJPY"
+    ]
+  },
+  {
+    "time_utc": "2026-08-26T01:30:00Z",
+    "impact": "HIGH",
+    "title": "AUD CPI y/y",
+    "symbols": [
+      "AUDUSD",
+      "EURAUD",
+      "AUDJPY"
+    ]
+  },
+  {
+    "time_utc": "2026-08-26T01:30:00Z",
+    "impact": "HIGH",
+    "title": "AUD Trimmed Mean CPI m/m",
+    "symbols": [
+      "AUDUSD",
+      "EURAUD",
+      "AUDJPY"
+    ]
+  },
+  {
+    "time_utc": "2026-08-26T12:30:00Z",
+    "impact": "HIGH",
+    "title": "USD Core PCE Price Index m/m",
+    "symbols": [
+      "XAUUSD",
+      "XAGUSD",
+      "USOIL",
+      "BTCUSD",
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "USDCHF",
+      "USDCAD",
+      "AUDUSD",
+      "NZDUSD",
+      "US30",
+      "NAS100",
+      "SPX500"
+    ]
+  },
+  {
+    "time_utc": "2026-08-26T12:30:00Z",
+    "impact": "HIGH",
+    "title": "USD Prelim GDP q/q",
+    "symbols": [
+      "XAUUSD",
+      "XAGUSD",
+      "USOIL",
+      "BTCUSD",
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "USDCHF",
+      "USDCAD",
+      "AUDUSD",
+      "NZDUSD",
+      "US30",
+      "NAS100",
+      "SPX500"
+    ]
+  },
+  {
+    "time_utc": "2026-08-28T12:30:00Z",
+    "impact": "HIGH",
+    "title": "CAD GDP m/m",
+    "symbols": [
+      "USDCAD",
+      "USOIL"
+    ]
+  },
+  {
+    "time_utc": "2026-08-28T14:00:00Z",
+    "impact": "HIGH",
+    "title": "USD Fed Chairman Warsh Speaks",
+    "symbols": [
+      "XAUUSD",
+      "XAGUSD",
+      "USOIL",
+      "BTCUSD",
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "USDCHF",
+      "USDCAD",
+      "AUDUSD",
+      "NZDUSD",
+      "US30",
+      "NAS100",
+      "SPX500"
+    ]
+  },
+  {
+    "time_utc": "2026-08-28T14:00:00Z",
+    "impact": "HIGH",
+    "title": "USD Prelim Benchmark Payrolls Revision",
+    "symbols": [
+      "XAUUSD",
+      "XAGUSD",
+      "USOIL",
+      "BTCUSD",
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "USDCHF",
+      "USDCAD",
+      "AUDUSD",
+      "NZDUSD",
+      "US30",
+      "NAS100",
+      "SPX500"
+    ]
+  },
+  {
+    "time_utc": "2026-08-28T16:15:00Z",
+    "impact": "HIGH",
+    "title": "ALL Jackson Hole Symposium",
+    "symbols": []
+  }
+]

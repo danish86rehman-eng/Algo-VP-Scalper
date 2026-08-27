@@ -1,0 +1,69 @@
+{
+  "symbols": ["XAUUSD"],
+  "cross_assets": ["XAUUSD", "XAGUSD", "USOIL"],
+  "_doc_cross_assets": "Read-only correlation inputs for CAIA. Not a trading list — see symbols.",
+  "timeframes": ["D1", "H4", "H1", "M15", "M5"],
+  "sessions": {
+    "london_kz":  { "start": "07:00", "end": "10:00", "weight": 1.0  },
+    "london_sb":  { "start": "08:00", "end": "09:00", "weight": 1.2  },
+    "ny_kz":      { "start": "12:00", "end": "15:00", "weight": 1.0  },
+    "ny_sb":      { "start": "15:00", "end": "16:00", "weight": 1.2  },
+    "off_session":{ "weight": 0.3 }
+  },
+  "risk": {
+    "high_clarity_risk_pct":   16.0,
+    "medium_clarity_risk_pct": 8.0,
+    "low_clarity_risk_pct":    0.0,
+    "max_total_exposure_pct":  40.0,
+    "max_positions":           2,
+    "max_drawdown_pct":        40.0,
+    "min_rr_ratio":            2.0
+  },
+  "governance": {
+    "default_mode":            "BALANCED",
+    "aggressive_dd_threshold": 2.0,
+    "balanced_dd_threshold":   5.0,
+    "defensive_dd_threshold":  7.0,
+    "preservation_dd_threshold": 10.0
+  },
+  "governance_limits": {
+    "_doc": "Per-mode hard cap on risk_pct produced by RiskEngine. CRG ABSTAINS if risk.risk_pct exceeds the cap for the active governance mode. Values sit just above what RiskEngine can legitimately output for HIGH-clarity setups so CRG remains a true safety net rather than a universal block. Reconciles the prior hardcoded 2.5% cap that conflicted with high_clarity_risk_pct=16.0.",
+    "AGGRESSIVE":   20.0,
+    "BALANCED":     12.0,
+    "DEFENSIVE":     4.0,
+    "PRESERVATION":  1.0
+  },
+  "single_trade_dollar_cap_pct": 5.0,
+  "_doc_single_trade_dollar_cap_pct": "Absolute dollar safety net: a single trade can never risk more than this % of current account equity, regardless of what the percent-based calc produces. Caps tail risk on small accounts even when governance allows aggressive sizing.",
+  "analysis_interval_seconds": 60,
+  "agent_consensus_threshold": 5,
+  "swing_lookback": 5,
+  "equal_hl_tolerance_pct": 0.002,
+  "fvg_min_size_pips": 3,
+  "displacement_atr_multiplier": 1.5,
+  "manipulation": {
+    "_doc": "sweep_wick_pct = how far price must pierce a liquidity pool to qualify as an institutional sweep. Calibrated per-symbol using live price data. reversal_bars = candles needed to confirm the reversal after sweep.",
+    "reversal_bars": 2,
+    "sweep_wick_pct_default": 0.001,
+    "symbol_sweep_pct": {
+      "_doc_XAUUSD": "Gold: $3 min sweep on ~$4708 price = 0.000637 (0.064%). Precise sweeps, institutions clear by $1-$3.",
+      "XAUUSD": 0.000637,
+      "_doc_XAGUSD": "Silver: $0.15 min sweep on ~$75.68 price = 0.002000 (0.20%). Volatile, wide spread, needs more room.",
+      "XAGUSD": 0.002000,
+      "_doc_BTCUSD": "Bitcoin: $80 min sweep on ~$78256 price = 0.001022 (0.10%). High nominal, filters noise.",
+      "BTCUSD": 0.001022,
+      "_doc_USOIL": "Oil: $0.25 min sweep on ~$93.39 price = 0.002677 (0.27%). Respects key levels tightly.",
+      "USOIL": 0.002677
+    }
+  },
+  "meta_fund": {
+    "rebalance_interval_trades": 10,
+    "lookback_trades": 20,
+    "min_sharpe_to_activate": 0.5
+  },
+  "simulation": {
+    "monte_carlo_runs": 500,
+    "min_win_prob_to_trade": 0.52
+  },
+  "dry_run": false
+}

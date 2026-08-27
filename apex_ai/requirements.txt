@@ -1,0 +1,11 @@
+MetaTrader5>=5.0.45
+pandas>=2.0.0
+numpy>=1.24.0
+rich>=13.7.0
+python-dotenv>=1.0.0
+
+# Charting for plot_backtest_results.py — was imported but never declared.
+matplotlib>=3.7.0
+
+# Removed 2026-08-22: pandas-ta, scipy and colorama were pinned but not
+# imported anywhere in the tree. Re-add them if a module starts using them.
