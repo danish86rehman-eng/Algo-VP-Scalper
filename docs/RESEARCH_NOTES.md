@@ -1306,6 +1306,208 @@ zeroed only 2020-03 -> 2025-03). Testing the trigger's cost sensitivity needs a
 window inside the zeroed range, which is also a window where every result is a
 function of the assumed floor.
 
+
+## §19 — L-003 closed: the simulator now models the live Guardian
+
+**Status: research only. Ships OFF (`TGA_EXITS_IN_SIM = False`).** The live bot
+is performing and nothing here changes it.
+
+L-003 recorded that "the simulator models no trailing; the live Guardian does",
+and concluded that entry-side remedies were measurable while exit-side ones
+were not. That gap is now closed behind `--tga-exits`.
+
+**How.** The Guardian's decision surface — `SLEngine`, `EarlyCloseEngine`,
+`TPEngine`, `TGAConfig`, `TGAPositionRecord` — moved into a new MT5-free
+`scalper/tga_engines.py`. `trade_guardian_agent.py` and
+`scalper/exit_manager.py` import the SAME class objects; the parity test uses
+`assertIs`, not an equivalence check, because the four constants that drifted
+before `decision_params` existed drifted while a comment asked editors to keep
+them in step. All thirteen thresholds now live in `decision_params` as `TGA_*`.
+
+**The approximation, stated.** The Guardian sees ticks, the simulator sees M5
+bars. Peak/adverse R updates from the bar's extremes — a tick would have
+reached them — but the resulting stop only becomes effective on the NEXT bar,
+because trailing from an extreme inside the bar that made it is look-ahead.
+Stop still beats target on an intrabar tie, unchanged. Market closes fill at
+the bar close. The frame handed to the engines ends at the bar being evaluated
+and its "forming" row is synthesised from that bar's own close, so a future bar
+is never present to be read.
+
+### 19.1 The gap is large enough to have invalidated the exit-side record
+
+XAUUSD, $1000 @ 3%, `--spread-pips 2.5`.
+
+| | trades | WR | net $ | PF | sumR |
+|---|---:|---:|---:|---:|---:|
+| W1 static (as shipped) | 281 | 45.91% | +2757.57 | 1.35 | +53.10 |
+| W1 `--tga-exits` | 359 | 50.14% | +2008.19 | 1.27 | +41.34 |
+| W2 static | 632 | 35.28% | **-650.02** | 0.91 | -17.99 |
+| W2 `--tga-exits` | 908 | 48.13% | **+585.54** | 1.03 | +31.52 |
+
+**W2 flips sign.** The window this repository has been calling unprofitable is
+profitable once the Guardian is modelled.
+
+The exit profile is unrecognisable. W1 static can only produce
+`SL 137 / TP 85 / TIMEOUT 45 / EOD 14`. Managed: `SL 124 / EARLY_CLOSE 119 /
+NO_PROGRESS 54 / TP 29 / TRAIL_SL 15 / TIMEOUT 12 / BREAKEVEN_SL 4 / EOD 2`.
+**Early close is the dominant live exit and the simulator had no
+representation of it at all.**
+
+`NO_PROGRESS` resolves an open question from §13.10, which recorded 36 of 115
+reconciled live losses closing without price ever reaching the original stop
+(median MAE 0.54R) and noted that a breakeven stop cannot produce that. The
+60-minute no-progress kill produces exactly that shape, and it was the one live
+exit path with no simulator counterpart.
+
+### 19.2 What the Guardian does on identical entries
+
+Shared bars only — same symbol, same entry time, same prices:
+
+| transition | W1 n | W1 deltaR | W2 n | W2 deltaR |
+|---|---:|---:|---:|---:|
+| **TP -> EARLY_CLOSE** | 37 | **-38.74** | 54 | **-51.12** |
+| **SL -> EARLY_CLOSE** | 18 | **+33.52** | 39 | **+70.34** |
+| SL -> NO_PROGRESS | 15 | +10.52 | 21 | +13.50 |
+| TIMEOUT -> EARLY_CLOSE | 18 | +4.78 | 27 | +11.87 |
+| TP -> TRAIL_SL | 8 | -6.63 | 11 | -8.98 |
+
+Shared-bar R change: W1 **-0.88** (neutral), W2 **+35.80**. Early close is
+two-sided and the sides nearly cancel: it rescues losers (+33.5R / +70.3R) and
+kills winners (-38.7R / -51.1R).
+
+**The 91 `TP -> EARLY_CLOSE` trades, worth about -90R across both windows, are
+the best-evidenced exit defect in this repository.** They are entries that
+would have reached the 2R target, closed early for roughly -1R each. Recorded,
+not acted on.
+
+### 19.3 Two caveats on reading §19.1
+
+* **The W2 dollar delta is confounded.** `LOT_FLOOR` goes 872 -> 91: the
+  managed arm ends near $1585 instead of $350, so its 3% risk unit is ~4.5x
+  larger and it can size signals the static arm rejects. 908 trades against
+  632, only 386 shared. §13.9 in its purest form — trust the **+35.80 shared-bar
+  R**, not the dollars.
+* **The Guardian's effect is not fold-consistent** (-$749 / +$1236). By §13.12
+  it has no demonstrated edge. That is the wrong test here: the Guardian runs
+  on the live account regardless, so the simulator should model it because it
+  **happens**, not because it wins.
+
+**Default stays OFF.** Turning it on would invalidate every stored baseline and
+force re-measuring §§13.8-13.15 against a new reference. Ledger L-003.
+
+
+## §20 — L-015 `VP_LEG_CONFLUENCE`: quality rose in one window and inverted in the other
+
+**Status: research only. Ships OFF (`LEG_CONF_ENABLED = False`).**
+
+Operator hypothesis, 2026-08-28: two completed H4 swing legs (P1 low -> P2 high,
+P2 high -> P3 low) supply the locations; an existing `SWEEP_REJECTION` or
+`BOS_RETEST` supplies the entry. *Quality over quantity.*
+
+Deliberately a **veto, not a trigger** — the inverse of L-014, which made the
+profile a signal, detected 1044-2608 times per window and displaced
+`SWEEP_REJECTION` 277 -> 80. A veto cannot inflate the trade count, so "fewer
+but better" is directly falsifiable. Design: `docs/DESIGN_VP_LEG_CONFLUENCE.md`.
+
+### 20.1 The result
+
+XAUUSD, $1000 @ 3%, `--spread-pips 2.5`, two **disjoint** windows.
+
+**W1 2026-05-15 .. 08-23**
+
+| arm | n | WR | net $ | PF | sumR | avgR |
+|---|---:|---:|---:|---:|---:|---:|
+| baseline | 281 | 45.91% | **+2757.57** | 1.35 | +53.10 | +0.1890 |
+| `LVN_VETO` | 278 | 44.96% | +1957.73 | 1.27 | +45.18 | +0.1625 |
+| `AT_LEVEL` | 212 | 47.17% | +2182.62 | **1.42** | +43.56 | **+0.2055** |
+| `CONFLUENCE_ONLY` | 174 | 46.55% | +1921.92 | **1.49** | +40.93 | **+0.2352** |
+
+**W2 2025-08-01 .. 2026-05-14**
+
+| arm | n | WR | net $ | PF | sumR | avgR |
+|---|---:|---:|---:|---:|---:|---:|
+| baseline | 632 | 35.28% | -650.02 | 0.91 | -17.99 | -0.0285 |
+| `LVN_VETO` | 614 | 35.83% | -618.54 | 0.91 | -14.75 | -0.0240 |
+| `AT_LEVEL` | 530 | 34.53% | -767.68 | 0.87 | -38.13 | -0.0719 |
+| `CONFLUENCE_ONLY` | 478 | 33.89% | -794.92 | 0.87 | -40.67 | -0.0851 |
+
+**In W1 the hypothesis is visibly true.** PF rises monotonically with
+strictness — 1.35 -> 1.42 -> 1.49 — and per-trade expectancy rises with it,
++0.1890R -> +0.2055R -> +0.2352R. Fewer trades, better each. That is exactly
+the predicted shape.
+
+**In W2 the same knob runs backwards.** PF 0.91 -> 0.87 -> 0.87 and avgR
+-0.0285 -> -0.0719 -> -0.0851, monotonically worse. The mechanism is not
+stable across regimes, which is §13.12's standing rejection criterion.
+
+**And the quality gain never paid for itself even in W1.** `CONFLUENCE_ONLY`
+lifted avgR by 24% (+0.1890 -> +0.2352) while cutting trades 38% (281 -> 174).
+Net P&L fell $835.65 and sumR fell 12.17. That is the arithmetic of
+quality-over-quantity: expectancy must rise by MORE than the proportional
+volume lost, and here it did not come close.
+
+Every mode loses money in both windows. Delta net $: `LVN_VETO` -799.84 /
++31.48, `AT_LEVEL` -574.95 / -117.66, `CONFLUENCE_ONLY` -835.65 / -144.90.
+
+### 20.2 A veto buys a lottery ticket on whatever comes next
+
+The clearest instance yet of the effect §13.11 and §13.13 both flagged.
+
+W1 `LVN_VETO` removed **18** trades worth **-$272.86** — genuinely bad trades,
+avgR -0.2434. The book still fell **$799.84**. The reason is the **15 NEW**
+trades the arm took and the baseline did not: WR **6.67%**, **-$605.11**,
+avgR **-0.8200**.
+
+Vetoing a losing trade does not bank its loss. It frees a position slot and
+skips a cooldown, so a different signal is taken later. Every arm produced new
+trades despite being a pure veto — 15 / 29 / 31 in W1 and 25 / 45 / 51 in W2.
+
+**The attribution trap fired a sixth time.** In W1 `CONFLUENCE_ONLY` the kept
+set's baseline avgR is +0.2767, which reads as a large improvement; the arm
+actually delivered +0.2352. And the trades it removed were **profitable** in
+aggregate: 138 trades, +$393.68, PF 1.10, sumR +13.53.
+
+### 20.3 Coverage — why the effect size is capped
+
+A leg pair exists on only a minority of candidate bars, so the filter is
+`NO_OPINION` (and admits) most of the time:
+
+| arm | W1 coverage | W2 coverage |
+|---|---:|---:|
+| `LVN_VETO` | 49.3% (287/582) | 23.3% (692/2976) |
+| `AT_LEVEL` | 67.3% (614/912) | 28.0% (929/3312) |
+| `CONFLUENCE_ONLY` | 73.2% (823/1124) | 31.5% (1086/3445) |
+
+The `MIN_LEG_BARS = 6` / `MIN_LEG_ATR = 1.5` floors plus strict pivot
+alternation refuse the rest, and W2's coverage is roughly half of W1's. The
+floors were NOT loosened to manufacture reach: a shorter or shallower span is
+chop, and its "levels" are an artefact of the binning.
+
+Label split is nonetheless real — W1 `CONFLUENCE_ONLY` saw `CONFLUENCE` 43,
+`AT_LEVEL` 215, `IN_LVN` 78, `NO_LEVEL` 487 — so the classifier is neither a
+no-op nor a blanket block.
+
+### 20.4 Design evidence used (Grade C, §13.7)
+
+None of these publish a win rate, profit factor or sample size.
+
+* **Art. 20327 (AVPT)** — reversion: reject VAL -> buy targeting POC; reject VAH
+  -> sell targeting POC; **stops at the nearest LVN**; breakout variant stops at
+  the nearest HVN; LTF rejection confirmation required. Backtest XAUUSD H4
+  Sep-Nov 2025 exists as images only — no numbers in text.
+* **Blog 772228 (SMC zones + session VP)** — the orientation this design rests
+  on: a zone "that overlaps the session POC or a value area edge is backed by
+  real transacted volume", one "inside a low volume node is fragile". Naked POC
+  as magnet/target. No performance data; the author says to judge it on a
+  sample, not one trade.
+* **CodeBase 76264** — the HVN/LVN definition used here: bins more than
+  `StdDevMult` (default **1.0**) standard deviations above/below mean bin
+  volume.
+
+This corrected the DIRECTION of L-005's rule — §13.11 found `AT_POC` was the
+book's best bucket (PF 2.10) while `VP_GATE` shipped "no trade at the POC" —
+but a correct orientation is not an edge. Ledger L-015.
+
 ## Source index
 
 - [MQL5 art. 18991 — Position Sizing](https://www.mql5.com/en/articles/18991)

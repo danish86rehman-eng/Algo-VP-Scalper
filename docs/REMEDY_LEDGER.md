@@ -665,6 +665,51 @@ audit measures the strategy's shape, not its live expectancy.
 - **Hypothesis**  : re-anchoring SL/TP and the volume calculation to the fill
                     price preserves the intended R multiple without changing
                     which trades are admitted.
+### L-012 — RE-MEASURED 2026-08-28 on n=23: the haircut is less than half what n=11 showed
+
+Run with both agents stopped (no MT5 contention), `logs/scalper_log.json`
+signal prices against `history_deals_get` fills, deal history from 2026-08-01.
+287 of 310 log rows have no deal record — the broker archive starts 2026-08-01
+while the log reaches back to May — so 23 is everything available.
+
+| | n=11 (2026-08-26) | **n=23 (2026-08-28)** |
+|---|---:|---:|
+| adverse fills | 8/11 (72.7%) | **14/23 (60.9%)** |
+| median realized R:R | 1.852 | **1.945** |
+| reward-leg haircut | 0.9260 | **0.9723** |
+| worst case | 0.54R | 0.543R |
+
+Median slippage **+0.347** price units (adverse); median risk inflation
+(actual stop / intended stop) **1.0188**. Distribution: p10 **1.438R**,
+p25 **1.614R**, p75 **2.734R**. **7 of 23 (30.4%)** land below the 1.81
+survival line.
+
+**Three cautions that stop this from being good news.**
+
+* **The mean and max of realized R:R are meaningless — use the median only.**
+  Mean 2.723, max 16.195R. When a fill lands almost on the stop, actual risk
+  tends to zero and the ratio explodes. This is a defect of the metric, not a
+  favourable tail.
+* **Mean slippage is FAVOURABLE (-0.832).** The demo server fills better than
+  the signal on average. That is a demo artefact and will not survive a live
+  book, so **0.9723 is a floor, not an estimate.**
+* **It is still the size of the whole edge.** §13.12 records gross gains
+  $81,265 against gross losses $78,982 — a 2.9% margin. A 2.8% reward-leg
+  haircut is the same order of magnitude as the entire edge.
+
+**Consequence for the -$3,731 / PF 0.9528 figure in §13.12.** That projection
+applied a **0.9260** haircut. The measured haircut is **0.9723**, so the drag
+is roughly 38% of what was projected. **The corrected nine-year figure has NOT
+been computed** — it requires re-running the L-008 campaign, which was not done
+here. Do not quote a revised number; quote the haircut and say the projection
+overstates the drag.
+
+Status unchanged: **OPEN, measurement only.** n=23 is still far below anything
+§13.5 acts on, and re-anchoring moves a stop, which makes it an exit-side
+change under L-003. L-003 is now closed (the simulator models the Guardian
+behind `--tga-exits`), so the prerequisite that blocked this is gone — but the
+fix itself is still unmeasured.
+
 - **Status**      : **OPEN — measurement only, no code change.** n=11 is far
                     below anything §13.5 acts on, and the fix is not free: it
                     moves the stop, so it is an exit-side change and L-003
@@ -969,3 +1014,101 @@ promote from a bucket.
                 field (281 trades, +$2757.57, identical trade list; the only
                 diff is the six telemetry columns added since that file was
                 written).
+
+
+## L-003 — CLOSED 2026-08-28: the simulator now models the live Guardian
+- **Opened**      : the simulator modelled a static stop and target while the
+                    live Guardian trails through three stages, arms an early
+                    close at +1R, kills no-progress trades at 60 minutes and
+                    banks a partial into an extended target. Consequence
+                    recorded at the time: entry-side remedies were measurable,
+                    exit-side ones were not.
+- **Remedy**      : `scalper/tga_engines.py` (the Guardian's decision surface,
+                    MT5-free, imported by BOTH processes — `assertIs`, not an
+                    equivalence check), `scalper/exit_manager.py` (bar-driven
+                    replay), `TGA_*` in `decision_params`, `--tga-exits`.
+- **Result**      : the gap was large enough to have invalidated the exit-side
+                    record. W2 flips sign, -$650.02 -> +$585.54. Early close is
+                    the dominant live exit (119 / 290 occurrences) and had no
+                    simulator representation at all. `NO_PROGRESS` explains
+                    §13.10's 36 losses that closed without price reaching the
+                    original stop.
+- **Verdict**     : **CLOSED as a fidelity fix. Ships OFF**
+                    (`TGA_EXITS_IN_SIM = False`) so every stored baseline stays
+                    byte-comparable; flag-off reproduces the W1 baseline trade
+                    list exactly. Flipping the default would force re-measuring
+                    §§13.8-13.15 against a new reference and is a separate
+                    decision, deliberately not taken here.
+- **Caveats**     : the W2 dollar delta is confounded — `LOT_FLOOR` 872 -> 91
+                    because the managed arm compounds to a larger risk unit, so
+                    only 386 of 908/632 trades are shared. Read the +35.80
+                    shared-bar R, not the dollars. The Guardian's own effect is
+                    NOT fold-consistent (-$749 / +$1236), which does not matter:
+                    it runs live regardless, so the simulator models it because
+                    it happens.
+- **Follow-on**   : 91 trades exit `TP -> EARLY_CLOSE` for about -90R across the
+                    two windows — entries that would have reached 2R, closed
+                    early for roughly -1R each. Best-evidenced exit defect in
+                    the repository. Recorded, not acted on; needs its own row.
+- **Notes**       : docs/RESEARCH_NOTES.md §19. 378 tests, compileall clean.
+
+
+## L-015 — VP_LEG_CONFLUENCE: two completed H4 swing legs as a location filter
+- **Opened**      : 2026-08-28, on an operator hypothesis — "if we use the VP
+                    anchor points, we can find better entries. Quality over
+                    quantity." P1 low -> P2 high -> P3 low; a profile per leg;
+                    entries still come from `SWEEP_REJECTION` / `BOS_RETEST`.
+- **Distinct from**: L-005 (rolling 42-bar profile, "no trade at the POC" —
+                    inverted, per §13.11) and L-014 (profile as SIGNAL, 1044-2608
+                    detections/window). Here the profile is a **veto only** and
+                    the legs are COMPLETED pivot-to-pivot, so their levels are
+                    static once formed.
+- **Evidence**    : Grade C design only (§13.7) — MQL5 art. 20327, blog 772228,
+                    CodeBase 76264. None publishes a win rate, PF or sample size.
+                    Blog 772228 supplies the orientation (a zone overlapping the
+                    POC is backed by volume; one inside an LVN is fragile),
+                    which corrects L-005's direction but is not an edge.
+- **Hypothesis**  : stated before the arms were run — strictness should raise
+                    per-trade expectancy enough to pay for the trades given up.
+- **Result**      : **half true in W1, inverted in W2.** In W1 PF rises
+                    monotonically with strictness (1.35 -> 1.42 -> 1.49) and
+                    avgR with it (+0.1890 -> +0.2055 -> +0.2352). In W2 the same
+                    knob runs backwards (PF 0.91 -> 0.87 -> 0.87; avgR -0.0285
+                    -> -0.0719 -> -0.0851). Sign flip across disjoint windows.
+
+                    | arm | delta W1 | delta W2 |
+                    |---|---:|---:|
+                    | `LVN_VETO`        | -$799.84 | +$31.48 |
+                    | `AT_LEVEL`        | -$574.95 | -$117.66 |
+                    | `CONFLUENCE_ONLY` | -$835.65 | -$144.90 |
+
+                    **The quality gain never paid for itself even where it was
+                    real**: `CONFLUENCE_ONLY` lifted avgR 24% while cutting
+                    trades 38%; net fell $835.65 and sumR fell 12.17.
+- **Verdict**     : **REJECTED for promotion. Ships disabled**
+                    (`LEG_CONF_ENABLED = False`, mode `LVN_VETO`), switchable
+                    via `--leg-conf` / `--leg-conf-mode`. Kept as research at
+                    the operator's instruction: the live bot is performing and
+                    nothing here touches it.
+- **Notes**       : two findings worth more than the verdict.
+
+                    1. **A veto buys a lottery ticket on what comes next.** W1
+                       `LVN_VETO` removed 18 trades worth -$272.86 (avgR
+                       -0.2434) and the book still fell $799.84, because the 15
+                       NEW trades it enabled ran WR 6.67%, -$605.11, avgR
+                       -0.8200. Every arm produced new trades despite being a
+                       pure veto — freeing a position slot and skipping a
+                       cooldown changes which trades come later.
+                    2. **The attribution trap fired a sixth time.** W1
+                       `CONFLUENCE_ONLY`'s kept set reads +0.2767 avgR on
+                       baseline numbers; the arm delivered +0.2352. The trades
+                       it removed were profitable in aggregate (138 trades,
+                       +$393.68, PF 1.10).
+
+                    Coverage caps the effect: a leg pair exists on 49-73% (W1)
+                    and 23-32% (W2) of candidates; elsewhere the filter is
+                    NO_OPINION and admits. The leg floors were not loosened to
+                    manufacture reach.
+- **Docs**        : docs/DESIGN_VP_LEG_CONFLUENCE.md;
+                    docs/RESEARCH_NOTES.md §20. 378 tests, compileall clean,
+                    filter-off reproduces the baseline trade list exactly.

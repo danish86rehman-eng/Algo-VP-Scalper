@@ -5,6 +5,100 @@ Newest first. Every entry states what changed, why, and how it was verified.
 
 ---
 
+## 2026-08-28 (2) — L-012 re-measured on n=23: the fill haircut is half what n=11 showed
+
+**Measurement only. No code change; no runtime behaviour change.**
+
+- Ran the fill reconciliation with both agents stopped (no MT5 contention),
+  comparing `logs/scalper_log.json` signal prices against `history_deals_get`
+  fills. 23 positions reconciled — 287 of 310 log rows have no deal record
+  because the broker archive starts 2026-08-01 while the log reaches to May.
+
+  | | n=11 (08-26) | **n=23 (08-28)** |
+  |---|---:|---:|
+  | adverse fills | 8/11 (72.7%) | **14/23 (60.9%)** |
+  | median realized R:R | 1.852 | **1.945** |
+  | reward-leg haircut | 0.9260 | **0.9723** |
+
+  Median slippage +0.347; stops 1.9% wider than intended; p10 1.438R;
+  **30.4% below the 1.81 survival line**.
+
+- **Cautions recorded with the number.** Mean/max realized R:R (2.723 / 16.195)
+  are meaningless — a fill landing on the stop sends actual risk to zero. Mean
+  slippage is *favourable*, a demo-server artefact, so 0.9723 is a floor not an
+  estimate. A 2.8% haircut is still the same order as S13.12's 2.9% gross margin.
+- **S13.12's -$3,731 / PF 0.9528 projection is annotated, not replaced.** It
+  used the 0.9260 haircut; the true drag is ~38% of it. The corrected nine-year
+  figure was NOT computed — that needs an L-008 re-run.
+- L-012 stays **OPEN, measurement only**. Its stated blocker (exit-side changes
+  unmeasurable under L-003) is now gone since L-003 closed, but the re-anchoring
+  fix itself remains unmeasured.
+
+**Operational note:** agents were stopped 07:34Z and restarted 07:35:39Z (~90s,
+no open positions). Restart verified — scalper ACTIVE on LONDON_OPEN, Guardian
+banner `BE@1.0R | Trail@1.5R | AggrTrail@2.5R`, confirming the refactored
+`TGAConfig` loads identical values.
+
+**Docs**: `docs/REMEDY_LEDGER.md` L-012, `CLAUDE.md` S13.14 and S13.12.
+
+---
+
+## 2026-08-28 — Guardian exit modelling in the simulator (L-003 closed) + VP_LEG_CONFLUENCE (L-015 rejected)
+
+**Both are RESEARCH ONLY and ship disabled.** The live bot is performing; no
+runtime behaviour changes in this entry.
+
+### L-003 — the simulator now models the live Trade Guardian
+- **Refactor.** The Guardian's decision surface (`SLEngine`,
+  `EarlyCloseEngine`, `TPEngine`, `TGAConfig`, `TGAPositionRecord`) moved out of
+  `trade_guardian_agent.py` into a new MT5-free `scalper/tga_engines.py`. Both
+  processes import the SAME class objects; parity is asserted with `assertIs`.
+  All thirteen thresholds moved to `decision_params` as `TGA_*`.
+- **New.** `scalper/exit_manager.py` replays those engines over M5 bars:
+  three-stage trailing with the breakeven structure-confirmation, early close,
+  the 60-minute no-progress kill, and TP extension including the partial fill.
+  Behind `--tga-exits`, default `TGA_EXITS_IN_SIM = False`.
+- **Measured.** W1 +$2757.57 -> +$2008.19; W2 **-$650.02 -> +$585.54** (sign
+  flip). Exit profile is unrecognisable — early close is the dominant live exit
+  (119 W1 / 290 W2) and had no simulator representation. `NO_PROGRESS` explains
+  §13.10's 36 losses that closed before price reached the original stop.
+- **Caveat.** W2's dollar delta is confounded: `LOT_FLOOR` 872 -> 91 because the
+  managed arm compounds to a larger risk unit. The clean figure is the
+  shared-bar R change, W1 -0.88 / W2 +35.80.
+- **Follow-on, not acted on.** 91 trades exit `TP -> EARLY_CLOSE` for about
+  -90R across both windows.
+
+### L-015 — `VP_LEG_CONFLUENCE`
+- **New.** `scalper/leg_confluence.py` — two COMPLETED H4 swing legs
+  (P1 low -> P2 high -> P3 low) as a location filter on existing triggers. A
+  veto only; direction, stop and target stay with the trigger. HVN/LVN from
+  MQL5 CodeBase 76264 (±1.0 SD of mean occupied bin volume). Modes
+  `CONFLUENCE_ONLY` / `AT_LEVEL` / `LVN_VETO`. Mirrored into both decision
+  paths in this change (invariant #2). Default `LEG_CONF_ENABLED = False`.
+- **Measured, 8 arms, two disjoint windows.** W1 PF rises monotonically with
+  strictness (1.35 -> 1.42 -> 1.49) and avgR with it (+0.1890 -> +0.2055 ->
+  +0.2352) — the hypothesis' predicted shape. W2 inverts (PF 0.91 -> 0.87 ->
+  0.87; avgR -0.0285 -> -0.0719 -> -0.0851). Sign flip across disjoint windows,
+  so **REJECTED** under S13.12.
+- **The quality gain never paid for itself even in W1**: avgR +24%, trades
+  -38%, net -$835.65, sumR -12.17.
+- **A veto buys a lottery ticket on what comes next.** W1 `LVN_VETO` removed 18
+  trades worth -$272.86 and the book still fell $799.84 — the 15 NEW trades it
+  enabled ran WR 6.67% / -$605.11 / avgR -0.8200.
+- **Attribution trap, sixth occurrence.** The kept set read +0.2767 avgR; the
+  arm delivered +0.2352, and the removed trades were profitable in aggregate
+  (138 trades, +$393.68, PF 1.10).
+
+**Verified**
+- 378 tests pass (`py -3.14 -E -m unittest discover -s tests`); compileall clean.
+- Both flags off reproduce `logs/l014b_w1_baseline.json` exactly — 281 trades,
+  +$2757.57, identical trade list and rejection counts.
+
+**Docs**: `docs/DESIGN_VP_LEG_CONFLUENCE.md`, `docs/RESEARCH_NOTES.md` S19-S20,
+`docs/REMEDY_LEDGER.md` L-003 (closed) and L-015 (rejected).
+
+---
+
 ## 2026-08-27 (2) — `VP_LIQUIDITY_REACTION` re-run against the fixed detector: REJECTED, ships disabled
 
 **Researched** (no behaviour change — the shipped default was already off)

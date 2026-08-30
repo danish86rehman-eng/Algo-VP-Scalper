@@ -776,6 +776,13 @@ $78,982 is a 2.9% margin. Applying only the measured reward-leg haircut
 **net -$3,731, PF 0.9528.** No gate measured so far is large enough to matter
 against that. Entry-side gate work is not where the remaining value is.
 
+**That projection used the n=11 haircut (0.9260) and overstates the drag.**
+§13.14 was re-measured 2026-08-28 on n=23 at **0.9723**, so the true drag is
+roughly 38% of the figure above. The corrected nine-year number has **not**
+been computed — it needs an L-008 re-run. Quote the haircut, not a revised net.
+The conclusion is unchanged in direction: a 2.8% reward haircut is still the
+same order as the 2.9% gross margin.
+
 **Two data facts about this broker's archive.** The 2018-03 -> 2019-09 windows
 produce **zero trades** — bars and triggers exist, but the archived spread is
 111-145 points and `STEP3` correctly rejects everything; that is a cost result,
@@ -867,10 +874,19 @@ derived from `trigger.entry_price` and never re-anchors them to the actual fill
 l.1360). Adverse slippage therefore widens real risk and narrows real reward at
 the same time.
 
-11 post-migration live trades reconciled against broker fills: 8 filled
-adversely, median realized R:R **1.852** against an intended 2.000, worst case
-**0.54R**. §13.1 demands RRR > 1.81 at the prior window's 35.53% win rate, so
-the median sits *on* the survival line and several trades fall under it.
+**Re-measured 2026-08-28 on n=23** (agents stopped, signal prices from
+`scalper_log.json` against `history_deals_get`): **14 of 23 filled adversely
+(60.9%), median realized R:R 1.945 against an intended 2.000** — a haircut of
+**0.9723**. Worst case 0.543R; p10 1.438R; stops run 1.9% wider than intended;
+**30.4% fall below the 1.81 survival line** §13.1 demands at a 35.53% win rate.
+
+This supersedes the original n=11 reading (8 of 11 adverse, median 1.852,
+haircut 0.9260) — the defect is real but roughly half as large as first
+measured. Three cautions: the **mean and max realized R:R are meaningless**
+(a fill landing on the stop sends actual risk to zero and the ratio to 16R —
+use the median); **mean slippage is favourable**, which is a demo-server
+artefact, so 0.9723 is a **floor**, not an estimate of live execution; and a
+2.8% haircut is still the same order as §13.12's entire 2.9% gross margin.
 
 **The simulator fills at the signal price by construction.** Every backtest
 number in this repository — including every table in §§13.8-13.13 — assumes a

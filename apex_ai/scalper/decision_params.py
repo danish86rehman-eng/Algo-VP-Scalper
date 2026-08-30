@@ -514,3 +514,44 @@ TGA_NO_PROGRESS_MAX_PEAK_R = 0.3
 #: Default OFF so every stored baseline stays byte-comparable; the flag is
 #: `--tga-exits`. See docs/RESEARCH_NOTES.md §19 for the measured gap.
 TGA_EXITS_IN_SIM = False
+
+
+# ── VP_LEG_CONFLUENCE (L-015) ─────────────────────────────────────────────────
+# Two COMPLETED H4 swing legs (P1->P2, P2->P3) as a location filter on the
+# triggers that already exist. Not a signal: it can only remove a trade, never
+# add one — which is what makes "quality over quantity" falsifiable rather than
+# assumed. Design: docs/DESIGN_VP_LEG_CONFLUENCE.md.
+
+#: Pivot confirmation depth on H4. Shared with VPLR deliberately: a pivot is
+#: either confirmed at this repository's standard or it is not.
+LEG_CONF_SWING_LOOKBACK = VPLR_H4_SWING_LOOKBACK
+
+#: Leg size floors. A short or shallow span is chop and its "levels" are an
+#: artefact of the binning, so the pair is refused rather than degraded.
+LEG_CONF_MIN_LEG_BARS = VPLR_MIN_LEG_BARS
+LEG_CONF_MIN_LEG_ATR = VPLR_MIN_LEG_ATR
+
+#: Profile geometry, matching the rest of the repo's VP work.
+LEG_CONF_ATR_PERIOD = VPLR_ATR_PERIOD
+LEG_CONF_TARGET_BINS = VPLR_TARGET_BINS
+LEG_CONF_VALUE_AREA_PCT = VPLR_VALUE_AREA_PCT
+
+#: How close to a POC / VAH / VAL counts as "at" it, in H4 ATR.
+LEG_CONF_ZONE_ATR = 0.25
+
+#: How close to a low-volume-node bin centre counts as inside it.
+LEG_CONF_LVN_ATR = 0.15
+
+#: HVN / LVN threshold in standard deviations of mean OCCUPIED bin volume.
+#: 1.0 is the default in MQL5 CodeBase 76264, which is where this definition
+#: comes from. Empty bins are excluded from the mean — see `_node_prices`.
+LEG_CONF_NODE_STDDEV_MULT = 1.0
+
+#: CONFLUENCE_ONLY | AT_LEVEL | LVN_VETO — see scalper/leg_confluence.py.
+#: LVN_VETO is the mode MQL5 blog 772228 actually argues for and the one whose
+#: sample stays closest to the baseline, which matters under §13.9.
+LEG_CONF_MODE = "LVN_VETO"
+
+#: Master switch. Default OFF; disabled mode must reproduce the baseline trade
+#: list exactly, and that is asserted by test rather than by inspection.
+LEG_CONF_ENABLED = False

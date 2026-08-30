@@ -127,6 +127,8 @@ from scalper.sa_consultant   import SAConsultant  # ReadOnly-Consultation layer
 from scalper.short_term_bias import ShortTermBiasFilter  # Task 6: short-term bias gate
 from scalper.cooldown        import SACooldown
 from scalper.ema_filter      import EMABandFilter  # H1 EMA(18) high/low band
+from scalper.leg_confluence  import (MODES as LEG_CONF_MODES, build_leg_pair,
+                                     evaluate as leg_conf_evaluate)
 from scalper.vp_gate         import MODES as VP_MODES, VolumeProfileGate
 from scalper.regime_classifier import RegimeClassifier  # trending vs ranging
 from scalper.regime_direction_gate import (
@@ -270,6 +272,8 @@ class ScalperAgent:
                  ema_band_enabled: bool = DP.EMA_BAND_ENABLED,
                  ema_band_mode: str = DP.EMA_BAND_MODE,
                  stb_relax_continuation: bool = DP.STB_RELAX_CONTINUATION,
+                 leg_conf_enabled: bool = DP.LEG_CONF_ENABLED,
+                 leg_conf_mode: str = DP.LEG_CONF_MODE,
                  vp_gate_enabled: bool = DP.VP_GATE_ENABLED,
                  vp_gate_mode: str = DP.VP_GATE_MODE,
                  vp_poc_band_frac: float = DP.VP_POC_BAND_FRAC,
@@ -380,6 +384,8 @@ class ScalperAgent:
         # H4 value-area location gate: sell from VAH, buy from VAL, nothing at
         # the POC. Every parameter comes from decision_params so the simulator
         # constructs an identical gate (invariant #2).
+        self.leg_conf_enabled = leg_conf_enabled
+        self.leg_conf_mode = leg_conf_mode
         self.vp_gate_enabled = vp_gate_enabled
         self.vp_gate = VolumeProfileGate(
             mode                = vp_gate_mode,
@@ -619,6 +625,26 @@ class ScalperAgent:
                                        bars=DP.VP_PROFILE_FETCH_BARS)
             vp_profile = self.vp_gate.build_profile(df_h4_vp)
 
+        # ── VP_LEG_CONFLUENCE legs (L-015) ──────────────────────────────────
+        # Two COMPLETED H4 swing legs, built once per scan before any trigger
+        # is chosen, so the same pair judges every candidate on this bar.
+        # `_get_ohlcv` reads from position 1, so no leg can include a forming
+        # H4 bar. Mirrored verbatim in backtest_scalper (invariant #2).
+        leg_pair = None
+        if self.leg_conf_enabled:
+            df_h4_legs = self._get_ohlcv(symbol, DP.VP_PROFILE_TF,
+                                         bars=DP.VP_PROFILE_FETCH_BARS)
+            if df_h4_legs is not None:
+                leg_pair = build_leg_pair(
+                    df_h4_legs, symbol,
+                    swing_lookback=DP.LEG_CONF_SWING_LOOKBACK,
+                    min_leg_bars=DP.LEG_CONF_MIN_LEG_BARS,
+                    min_leg_atr=DP.LEG_CONF_MIN_LEG_ATR,
+                    atr_period=DP.LEG_CONF_ATR_PERIOD,
+                    target_bins=DP.LEG_CONF_TARGET_BINS,
+                    value_area_pct=DP.LEG_CONF_VALUE_AREA_PCT,
+                    node_stddev_mult=DP.LEG_CONF_NODE_STDDEV_MULT)
+
         # ── VP_LIQUIDITY_REACTION context ────────────────────────────────────
         # The anchored H4 profile, plus the previous COMPLETED daily bar for
         # PDH/PDL. Both frames come from `_get_ohlcv`, which reads from
@@ -776,6 +802,24 @@ class ScalperAgent:
                 logger.debug(f"SA {symbol}: VP GATE abstained — {vp.reason}")
             else:
                 logger.info(f"SA {symbol}: VP GATE passed — {vp.reason}")
+
+        # ── VP_LEG_CONFLUENCE location filter (L-015) ───────────────────────
+        # A veto only — direction, stop and target stay with the trigger.
+        # Placed after the existing location gates and before STB, exactly as
+        # in backtest_scalper, so both paths judge the same candidate set.
+        if self.leg_conf_enabled:
+            lc = leg_conf_evaluate(
+                float(df_m5['close'].iloc[-1]), leg_pair, self.leg_conf_mode,
+                DP.LEG_CONF_ZONE_ATR, DP.LEG_CONF_LVN_ATR)
+            if not lc.admit:
+                logger.info(
+                    f"SA {symbol}: LEG CONFLUENCE blocked {trigger.direction} "
+                    f"{trigger.trigger_type} — {lc.label} [{lc.pair_summary}]")
+                self.rejects.record(lc.reason(), symbol, lc.label, now)
+                return
+            logger.info(
+                f"SA {symbol}: LEG CONFLUENCE passed — {lc.label} "
+                f"{'+'.join(lc.matched_levels) or 'no-level'}")
 
         # ── Task 6: Short-Term Bias Gate (replaces HTFBiasFilter) ─────────────
         # Three layers:
@@ -2056,6 +2100,16 @@ def main():
                              "from VAL, no trade at the POC. Default off "
                              "pending the 60/20/20 fold test "
                              "(scalper/decision_params.py).")
+    parser.add_argument("--leg-conf", dest="leg_conf",
+                        action=argparse.BooleanOptionalAction,
+                        default=DP.LEG_CONF_ENABLED,
+                        help="VP_LEG_CONFLUENCE: filter entries by "
+                             "location against two completed H4 swing "
+                             "legs (ledger L-015)")
+    parser.add_argument("--leg-conf-mode", type=str,
+                        default=DP.LEG_CONF_MODE,
+                        choices=list(LEG_CONF_MODES),
+                        help="CONFLUENCE_ONLY | AT_LEVEL | LVN_VETO")
     parser.add_argument("--vp-gate-mode", type=str, default=DP.VP_GATE_MODE,
                         choices=list(VP_MODES),
                         help="RANGING_ONLY: apply only when the regime "
@@ -2170,6 +2224,8 @@ def main():
         pdr_gate_mode        = args.pdr_gate_mode,
         vplr_enabled         = args.vplr,
         vplr_session_override= args.vplr_session_override,
+        leg_conf_enabled     = args.leg_conf,
+        leg_conf_mode        = args.leg_conf_mode,
         vp_gate_enabled      = args.vp_gate,
         vp_gate_mode         = args.vp_gate_mode,
         vp_poc_band_frac     = args.vp_poc_band,

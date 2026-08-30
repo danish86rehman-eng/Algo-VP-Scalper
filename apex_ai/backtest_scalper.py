@@ -44,6 +44,9 @@ from scalper.session_checker import SASessionChecker
 from scalper.short_term_bias import ShortTermBiasFilter
 from scalper.trigger_engine import (
     SATrigger, SATriggerEngine, resolve_enabled_triggers)
+from scalper.leg_confluence import (
+    MODES as LEG_CONF_MODES, build_leg_pair,
+    evaluate as leg_conf_evaluate)
 from scalper.vp_gate import MODES as VP_MODES, VolumeProfileGate
 from scalper.regime_classifier import RegimeClassifier
 from scalper.regime_direction_gate import (
@@ -80,6 +83,17 @@ from scalper.decision_params import (
     RD_REGIME_BARS,
     RD_REGIME_TF,
     VP_EDGE_TOLERANCE_FRAC,
+    LEG_CONF_ATR_PERIOD,
+    LEG_CONF_ENABLED,
+    LEG_CONF_LVN_ATR,
+    LEG_CONF_MIN_LEG_ATR,
+    LEG_CONF_MIN_LEG_BARS,
+    LEG_CONF_MODE,
+    LEG_CONF_NODE_STDDEV_MULT,
+    LEG_CONF_SWING_LOOKBACK,
+    LEG_CONF_TARGET_BINS,
+    LEG_CONF_VALUE_AREA_PCT,
+    LEG_CONF_ZONE_ATR,
     VP_GATE_ENABLED,
     VP_GATE_MODE,
     VP_POC_BAND_FRAC,
@@ -564,6 +578,8 @@ def run_backtest(
     ema_band_enabled: bool = EMA_BAND_ENABLED,
     ema_band_mode: str = EMA_BAND_MODE,
     stb_relax_continuation: bool = STB_RELAX_CONTINUATION,
+    leg_conf_enabled: bool = LEG_CONF_ENABLED,
+    leg_conf_mode: str = LEG_CONF_MODE,
     vp_gate_enabled: bool = VP_GATE_ENABLED,
     vp_gate_mode: str = VP_GATE_MODE,
     vp_poc_band_frac: float = VP_POC_BAND_FRAC,
@@ -630,6 +646,9 @@ def run_backtest(
     )
     # Mirrors ScalperAgent's VP gate (invariant #2). Every parameter is
     # imported from decision_params, so the two constructions cannot drift.
+    # Observation only (§13.10): counted, never branched on.
+    leg_conf_labels: Counter = Counter()
+    leg_conf_admitted: Counter = Counter()
     vp_gate = VolumeProfileGate(
         mode                = vp_gate_mode,
         profile_bars        = VP_PROFILE_BARS,
@@ -809,6 +828,25 @@ def run_backtest(
             vp_profile = vp_gate.build_profile(
                 _closed_tf(frames['H4'], now, VP_PROFILE_FETCH_BARS, 240))
 
+        # ── VP_LEG_CONFLUENCE legs — mirrors _scan_symbol (invariant #2) ────
+        # Built once per symbol per bar, before any trigger is selected, so the
+        # same two legs judge every candidate on this bar. `_closed_tf` for the
+        # same reason as every other H4 read: an opening stamp in the past does
+        # not mean the bar has closed, and a profile over a forming bar
+        # repaints.
+        leg_pair = None
+        if leg_conf_enabled:
+            leg_pair = build_leg_pair(
+                _closed_tf(frames['H4'], now, VP_PROFILE_FETCH_BARS, 240),
+                symbol,
+                swing_lookback=LEG_CONF_SWING_LOOKBACK,
+                min_leg_bars=LEG_CONF_MIN_LEG_BARS,
+                min_leg_atr=LEG_CONF_MIN_LEG_ATR,
+                atr_period=LEG_CONF_ATR_PERIOD,
+                target_bins=LEG_CONF_TARGET_BINS,
+                value_area_pct=LEG_CONF_VALUE_AREA_PCT,
+                node_stddev_mult=LEG_CONF_NODE_STDDEV_MULT)
+
         # ── VP_LIQUIDITY_REACTION context — mirrors _scan_symbol ─────────────
         # `_closed_tf`, not `_closed`, on both the H4 and D1 frames: a bar whose
         # opening stamp is in the past has not necessarily closed, and an
@@ -914,6 +952,20 @@ def run_backtest(
                 rejects["VP_GATE"] += 1
                 rejects_by_trigger[f"VP_GATE:{ttype}"] += 1
                 continue
+
+        # ── VP_LEG_CONFLUENCE location filter — mirrors _scan_symbol ────────
+        # A veto only: direction, stop and target stay with the trigger. It is
+        # placed after the existing location gates and before STB so it sees
+        # the same candidate set they do.
+        if leg_conf_enabled:
+            lc = leg_conf_evaluate(current_price, leg_pair, leg_conf_mode,
+                                   LEG_CONF_ZONE_ATR, LEG_CONF_LVN_ATR)
+            leg_conf_labels[lc.label] += 1
+            if not lc.admit:
+                rejects[lc.reason()] += 1
+                rejects_by_trigger[f"{lc.reason()}:{ttype}"] += 1
+                continue
+            leg_conf_admitted[lc.label] += 1
 
         # ── Short-term bias gate — mirrors _scan_symbol's STB block ──────────
         stb = stb_filter.check(
@@ -1114,6 +1166,8 @@ def run_backtest(
             "vp_gate_enabled": vp_gate_enabled,
             "vp_gate_mode": vp_gate_mode,
             "tga_exits": tga_exits,
+            "leg_conf_enabled": leg_conf_enabled,
+            "leg_conf_mode": leg_conf_mode,
             "vplr_enabled": vplr_enabled,
             "vplr_session_override": vplr_session_override,
             "vplr_scope": vplr_scope,
@@ -1155,6 +1209,8 @@ def run_backtest(
         },
         "rejections": dict(sorted(rejects.items(), key=lambda kv: -kv[1])),
         "triggers_detected": dict(sorted(detected.items(), key=lambda kv: -kv[1])),
+        "leg_conf_labels": dict(leg_conf_labels),
+        "leg_conf_admitted": dict(leg_conf_admitted),
         "rejections_by_trigger": dict(sorted(rejects_by_trigger.items(), key=lambda kv: -kv[1])),
         "equity_curve": equity_curve,
         "trades": [asdict(t) for t in all_trades],
@@ -1208,6 +1264,16 @@ def main() -> None:
                         default=VP_POC_BAND_FRAC,
                         help="Half-width of the POC dead zone as a fraction "
                              "of value-area width.")
+    parser.add_argument("--leg-conf", dest="leg_conf",
+                        action=argparse.BooleanOptionalAction,
+                        default=LEG_CONF_ENABLED,
+                        help="VP_LEG_CONFLUENCE: filter entries by their "
+                             "location against two completed H4 swing legs "
+                             "(ledger L-015)")
+    parser.add_argument("--leg-conf-mode", type=str, default=LEG_CONF_MODE,
+                        choices=list(LEG_CONF_MODES),
+                        help="CONFLUENCE_ONLY (both legs agree) | AT_LEVEL "
+                             "(either leg) | LVN_VETO (block low-volume nodes)")
     parser.add_argument("--tga-exits", dest="tga_exits",
                         action="store_true", default=TGA_EXITS_IN_SIM,
                         help="replay the live Trade Guardian's trailing, early "
@@ -1306,6 +1372,8 @@ def main() -> None:
             vp_gate_enabled=args.vp_gate,
             vp_gate_mode=args.vp_gate_mode,
             tga_exits=args.tga_exits,
+            leg_conf_enabled=args.leg_conf,
+            leg_conf_mode=args.leg_conf_mode,
             vplr_enabled=args.vplr,
             vplr_session_override=args.vplr_session_override,
             vplr_scope=args.vplr_scope,
