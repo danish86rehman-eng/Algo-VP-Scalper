@@ -1056,6 +1056,16 @@ class ScalperAgent:
                 "trigger_type": trigger.trigger_type,
                 "matched_triggers": list(trigger.matched_triggers),
                 "confidence": trigger.confidence,
+                # Gate state as it stood at entry. `stb` is already in scope
+                # here -- these values were computed by the STB gate above,
+                # printed to the log, and then dropped. Persisting them is what
+                # makes "did this trade agree with the HTF read?" answerable.
+                # Observation-only: nothing reads these back. CLAUDE.md 13.10.
+                "stb_confidence":  stb.confidence,
+                "short_term_bias": stb.short_term_bias,
+                "htf_trend":       stb.htf_trend,
+                "recent_sweep":    stb.recent_sweep or "",
+                "config_era":      DP.CONFIG_ERA,
                 # `vp_window_name` resolves to VP_ASIA when the trade was taken
                 # under the VP-only allowance; `sess.window_name` would say
                 # IDLE there, which is true of the normal windows and useless
@@ -1295,6 +1305,13 @@ class ScalperAgent:
                     risk_usd=float(info.get("risk_usd", 0.0) or 0.0),
                     spread_pips=float(info.get("spread_pips", 0.0) or 0.0),
                     sl_pips=float(info.get("sl_pips", 0.0) or 0.0),
+                    # Absent on adopted positions -- correctly reports UNKNOWN
+                    # rather than fabricating a value.
+                    stb_confidence=str(info.get("stb_confidence", "UNKNOWN")),
+                    short_term_bias=str(info.get("short_term_bias", "UNKNOWN")),
+                    htf_trend=str(info.get("htf_trend", "UNKNOWN")),
+                    recent_sweep=str(info.get("recent_sweep", "") or ""),
+                    config_era=str(info.get("config_era", "UNKNOWN")),
                 ),
                 "due": now + timedelta(
                     minutes=self.PM_LOOKAHEAD_BARS * self.CONFIRM_TF_MINUTES),

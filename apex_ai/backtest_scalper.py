@@ -176,6 +176,14 @@ class SimTrade:
     tga_mae_r: float = 0.0
     tga_tp_extended: bool = False
     tga_legs: int = 1
+    # -- Gate state at entry, mirroring the live agent's incident record.
+    #: Not required by invariant #2 (the postmortem pass is post-processing,
+    #: not a gate) but required for the two books to be poolable at all: a
+    #: sim row with UNKNOWN htf cannot be compared against a live row.
+    stb_confidence: str = "UNKNOWN"
+    short_term_bias: str = "UNKNOWN"
+    htf_trend: str = "UNKNOWN"
+    recent_sweep: str = ""
     vp_level: str = ""           # POC | VAH | VAL
     vp_level_source: str = ""    # PDH | SESSION_HIGH | EQUAL_HIGHS | SWING_* …
     vp_sweep_depth_atr: float = 0.0
@@ -225,6 +233,11 @@ def emit_incidents(all_trades, data, session_checker, path: str,
             session=sess.window_name,
             regime="SIM",
             confidence="SIM",
+            stb_confidence=t.stb_confidence,
+            short_term_bias=t.short_term_bias,
+            htf_trend=t.htf_trend,
+            recent_sweep=t.recent_sweep,
+            config_era=DP.CONFIG_ERA,
             lots=t.volume,
             risk_usd=t.risk_usd,
             spread_pips=0.0,
@@ -1106,6 +1119,16 @@ def run_backtest(
             tga_mae_r=round(outcome.adverse_r, 4) if outcome else 0.0,
             tga_tp_extended=(outcome.tp_extended if outcome else False),
             tga_legs=(len(outcome.legs) if outcome else 1),
+            # `stb` is bound on every path that reaches here: it is assigned at
+            # the loop-body indent, and every construct between that assignment
+            # and this one is a guard that `continue`s, which re-enters the loop
+            # and re-executes it. Mirrors the live registration site's four
+            # values exactly, including `or ""` for the Optional sweep string,
+            # so the two books compare field-for-field. Observation-only.
+            stb_confidence=stb.confidence,
+            short_term_bias=stb.short_term_bias,
+            htf_trend=stb.htf_trend,
+            recent_sweep=stb.recent_sweep or "",
             vp_level=(trigger.vplr.vp_level_name if trigger.vplr else ""),
             vp_level_source=(trigger.vplr.level_source if trigger.vplr else ""),
             vp_sweep_depth_atr=round(

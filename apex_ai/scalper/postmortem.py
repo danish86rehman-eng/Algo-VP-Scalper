@@ -80,6 +80,24 @@ TIMEOUT_STALL_R = 0.5
 COST_HEAVY_SPREAD_TO_SL = 0.10
 
 
+def htf_alignment(direction: str, htf_trend: str) -> str:
+    """
+    Whether a trade agreed with the higher-timeframe read at entry.
+
+    Defined here, once, for the same reason the R thresholds above are: the
+    live agent and the simulator must not develop two ideas of what
+    "counter-HTF" means. Purely descriptive -- nothing consults this before an
+    entry, and nothing may branch on it. See CLAUDE.md 13.10.
+    """
+    if direction not in ("BULLISH", "BEARISH"):
+        return "UNKNOWN"
+    if htf_trend == "RANGING":
+        return "NEUTRAL"
+    if htf_trend not in ("BULLISH", "BEARISH"):
+        return "UNKNOWN"
+    return "AGREE" if direction == htf_trend else "OPPOSE"
+
+
 # -- Failure taxonomy ---------------------------------------------------------
 #: Every label `classify()` can return, with the remedy family each points at.
 #: `docs/REMEDY_KB.md` is keyed on exactly these strings.
@@ -125,6 +143,18 @@ class TradeContext:
     spread_pips: float = 0.0
     sl_pips: float = 0.0
 
+    # -- Gate state at entry (observation-only; see module docstring) --------
+    # Computed by `short_term_bias` at decision time and logged to
+    # scalper_agent.log, then discarded before this record was written. That
+    # is why `sa_incidents.jsonl` cannot answer any question about gate
+    # behaviour. Persisted here as data only: no gate reads these.
+    stb_confidence:  str = "UNKNOWN"   # HIGH | MEDIUM | LOW | NONE
+    short_term_bias: str = "UNKNOWN"   # BULLISH | BEARISH | NEUTRAL | UNKNOWN
+    htf_trend:       str = "UNKNOWN"   # BULLISH | BEARISH | RANGING | UNKNOWN
+    recent_sweep:    str = ""
+    #: Shipped gate configuration, so aggregates cannot silently mix eras.
+    config_era:      str = "UNKNOWN"
+
     @property
     def risk_price(self) -> float:
         return abs(self.entry - self.stop_loss)
@@ -161,6 +191,15 @@ class Postmortem:
     close_time: str
     notes: str = ""
     evidence: Dict[str, Any] = field(default_factory=dict)
+
+    # -- Gate state carried through from TradeContext (observation-only) -----
+    stb_confidence:  str = "UNKNOWN"
+    short_term_bias: str = "UNKNOWN"
+    htf_trend:       str = "UNKNOWN"
+    recent_sweep:    str = ""
+    config_era:      str = "UNKNOWN"
+    #: AGREE | OPPOSE | NEUTRAL | UNKNOWN, from `htf_alignment()`.
+    htf_alignment:   str = "UNKNOWN"
 
     def to_record(self) -> Dict[str, Any]:
         return asdict(self)
@@ -215,6 +254,11 @@ def _unclassified(ctx: TradeContext, note: str) -> Postmortem:
         trigger_type=ctx.trigger_type, session=ctx.session, regime=ctx.regime,
         confidence=ctx.confidence, outcome=ctx.outcome,
         failure_mode="UNCLASSIFIED", pnl_usd=round(ctx.pnl_usd, 2),
+        stb_confidence=ctx.stb_confidence,
+        short_term_bias=ctx.short_term_bias,
+        htf_trend=ctx.htf_trend, recent_sweep=ctx.recent_sweep,
+        config_era=ctx.config_era,
+        htf_alignment=htf_alignment(ctx.direction, ctx.htf_trend),
         exit_r=round(exit_r, 3), mfe_r=0.0, mae_r=0.0,
         bars_to_mfe=0, bars_to_mae=0, bars_held=0,
         tp1_after_exit=False, bars_to_tp1_after_exit=0,
@@ -294,6 +338,11 @@ def _analyse_inner(ctx: TradeContext,
         ticket=ctx.ticket, symbol=ctx.symbol, direction=ctx.direction,
         trigger_type=ctx.trigger_type, session=ctx.session, regime=ctx.regime,
         confidence=ctx.confidence, outcome=ctx.outcome, failure_mode=mode,
+        stb_confidence=ctx.stb_confidence,
+        short_term_bias=ctx.short_term_bias,
+        htf_trend=ctx.htf_trend, recent_sweep=ctx.recent_sweep,
+        config_era=ctx.config_era,
+        htf_alignment=htf_alignment(ctx.direction, ctx.htf_trend),
         pnl_usd=round(ctx.pnl_usd, 2), exit_r=round(exit_r, 3),
         mfe_r=round(mfe_r, 3), mae_r=round(mae_r, 3),
         bars_to_mfe=bars_to_mfe, bars_to_mae=bars_to_mae,

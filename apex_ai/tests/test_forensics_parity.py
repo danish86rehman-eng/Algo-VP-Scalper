@@ -38,6 +38,87 @@ def _bars(rows, start=T0, minutes=5):
     ])
 
 
+class TestGateTelemetryIsObservationOnly(unittest.TestCase):
+    """
+    The Stage 0 telemetry fields carry gate state into the incident record.
+    They exist to be RECORDED, never to be CONSULTED. If the scan path ever
+    reads one, that is a gate wearing telemetry's clothes and has to be
+    mirrored and fold-tested like any other gate. See CLAUDE.md 13.10.
+    """
+
+    def test_derived_telemetry_never_reaches_the_decision_path(self):
+        src = (Path(__file__).resolve().parents[1] / "scalper_agent.py"
+               ).read_text(encoding="utf-8")
+        scan = src[src.index("def _scan_symbol"):src.index("def _execute_trade")]
+
+        # `htf_alignment` is DERIVED in postmortem for post-hoc analysis only.
+        # It has no business existing anywhere near a decision.
+        self.assertNotIn("htf_alignment", scan)
+
+        # The recorded fields may be WRITTEN in the scan path -- that is the
+        # registration site, and writing is the whole point. What must never
+        # happen is a BRANCH on one. Anything else is a gate wearing
+        # telemetry's clothes. See CLAUDE.md 13.10.
+        telemetry = ("stb_confidence", "short_term_bias", "htf_trend",
+                     "recent_sweep", "config_era", "CONFIG_ERA")
+        for line in scan.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if not any(name in stripped for name in telemetry):
+                continue
+            # A dict-literal write (`"config_era": DP.CONFIG_ERA,`) or a
+            # keyword argument is fine; a conditional is not.
+            self.assertFalse(
+                stripped.startswith(("if ", "elif ", "while ", "assert ")),
+                f"telemetry must not be branched on: {stripped!r}")
+            for op in (" == ", " != ", " in ", " not in ", " < ", " > "):
+                self.assertNotIn(
+                    op, stripped,
+                    f"telemetry must not be compared: {stripped!r}")
+
+    def test_htf_alignment_has_exactly_one_definition(self):
+        self.assertEqual(PM.htf_alignment("BULLISH", "BEARISH"), "OPPOSE")
+        self.assertEqual(PM.htf_alignment("BEARISH", "BULLISH"), "OPPOSE")
+        self.assertEqual(PM.htf_alignment("BULLISH", "BULLISH"), "AGREE")
+        self.assertEqual(PM.htf_alignment("BEARISH", "BEARISH"), "AGREE")
+        self.assertEqual(PM.htf_alignment("BULLISH", "RANGING"), "NEUTRAL")
+        self.assertEqual(PM.htf_alignment("BULLISH", "UNKNOWN"), "UNKNOWN")
+        self.assertEqual(PM.htf_alignment("UNKNOWN", "BULLISH"), "UNKNOWN")
+
+    def test_telemetry_round_trips_into_the_record(self):
+        ctx = PM.TradeContext(
+            ticket=1, symbol="XAUUSD", direction="BULLISH",
+            entry=100.0, stop_loss=99.0, tp1=102.0, outcome="LOSS",
+            pnl_usd=-10.0, open_time=T0, close_time=T0 + timedelta(minutes=30),
+            risk_usd=10.0,
+            stb_confidence="LOW", short_term_bias="NEUTRAL",
+            htf_trend="BEARISH", config_era="test-era",
+        )
+        rec = PM.analyse(ctx, _bars([(100.5, 98.5)] * 12), bar_minutes=5,
+                         lookahead_bars=4).to_record()
+        self.assertEqual(rec["stb_confidence"], "LOW")
+        self.assertEqual(rec["htf_trend"], "BEARISH")
+        self.assertEqual(rec["config_era"], "test-era")
+        # BULLISH trade under a BEARISH htf read.
+        self.assertEqual(rec["htf_alignment"], "OPPOSE")
+
+    def test_unclassified_path_also_carries_telemetry(self):
+        # The bars-unavailable path is the one least exercised in testing and
+        # most exercised in production edge cases.
+        ctx = PM.TradeContext(
+            ticket=2, symbol="XAUUSD", direction="BEARISH",
+            entry=100.0, stop_loss=101.0, tp1=98.0, outcome="LOSS",
+            pnl_usd=-10.0, open_time=T0, close_time=T0 + timedelta(minutes=30),
+            risk_usd=10.0,
+            stb_confidence="HIGH", htf_trend="BEARISH", config_era="test-era",
+        )
+        rec = PM.analyse(ctx, None, bar_minutes=5, lookahead_bars=4).to_record()
+        self.assertEqual(rec["stb_confidence"], "HIGH")
+        self.assertEqual(rec["config_era"], "test-era")
+        self.assertEqual(rec["htf_alignment"], "AGREE")
+
+
 class TestSingleSourceOfTruth(unittest.TestCase):
 
     def test_backtester_imports_the_live_forensic_module(self):
@@ -52,6 +133,31 @@ class TestSingleSourceOfTruth(unittest.TestCase):
                ).read_text(encoding="utf-8")
         self.assertIn("from scalper import postmortem as PMORTEM", src)
         self.assertIn("PMORTEM.analyse(", src)
+
+    def test_simulator_populates_gate_telemetry_from_the_gate(self):
+        # The fields existed on SimTrade for a day while nothing assigned them,
+        # so every sim row read UNKNOWN and the two books were not poolable on
+        # the one axis they were added to answer. A substring check would pass
+        # on the dataclass defaults, so this asserts the constructor keyword is
+        # present AND that its value comes off the `stb` gate result rather
+        # than a literal.
+        import ast
+        root = Path(__file__).resolve().parents[1]
+        tree = ast.parse((root / "backtest_scalper.py").read_text(
+            encoding="utf-8"))
+        calls = [n for n in ast.walk(tree)
+                 if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Name) and n.func.id == "SimTrade"]
+        self.assertEqual(len(calls), 1, "expected one SimTrade construction")
+        kwargs = {k.arg: k.value for k in calls[0].keywords if k.arg}
+        for field in ("stb_confidence", "short_term_bias", "htf_trend",
+                      "recent_sweep"):
+            self.assertIn(field, kwargs, f"simulator drops {field}")
+            names = {n.value.id for n in ast.walk(kwargs[field])
+                     if isinstance(n, ast.Attribute)
+                     and isinstance(n.value, ast.Name)}
+            self.assertIn("stb", names,
+                          f"{field} is not sourced from the STB gate result")
 
     def test_thresholds_have_exactly_one_definition(self):
         # A second copy of any of these silently gives the two processes

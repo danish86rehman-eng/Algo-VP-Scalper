@@ -555,3 +555,14 @@ LEG_CONF_MODE = "LVN_VETO"
 #: Master switch. Default OFF; disabled mode must reproduce the baseline trade
 #: list exactly, and that is asserted by test rather than by inspection.
 LEG_CONF_ENABLED = False
+
+
+# ── Configuration era ────────────────────────────────────────────────────────
+#: Stamped onto every incident row so aggregates cannot silently pool trades
+#: taken under different gate configurations. Bump this whenever a gate flag
+#: changes (EMA_BAND, VP_GATE, PDR_GATE, VPLR, allow_whole_day, ...).
+#:
+#: Why it exists: `logs/sa_incidents.jsonl` currently holds 204 `Whole_day`
+#: rows from 2026-05-06..05-15, taken before 13.6 closed that window. Every
+#: naive query over that file pools them with current-config trades.
+CONFIG_ERA = "2026-08-28-s1"

@@ -1112,3 +1112,120 @@ promote from a bucket.
 - **Docs**        : docs/DESIGN_VP_LEG_CONFLUENCE.md;
                     docs/RESEARCH_NOTES.md §20. 378 tests, compileall clean,
                     filter-off reproduces the baseline trade list exactly.
+
+## L-016 — wick-ratio qualification on the sweep candle (`SIGNAL_FALSE`)
+- **Opened**      : 2026-09-01, **pre-registered before any arm was run and
+                    before the enabling telemetry has produced a single row.**
+                    Source: `wiki/synthesis/correction-plan.md` §5 item 2,
+                    which ranks this as the largest addressable *entry-side*
+                    defect. **This entry authorises no code change.** It fixes
+                    the prediction and the rejection criteria in advance so
+                    that neither can be edited after seeing a result.
+- **Failure mode**: `SIGNAL_FALSE` — "never went meaningfully onside; the read
+                    was wrong."
+- **Measured cost (three populations, deliberately not pooled)**:
+
+                    | population | n | net $ | mean MFE |
+                    |---|---:|---:|---:|
+                    | sim, shipping config, W1 (280 trades) | 43 | -$2,209.84 | 0.17R |
+                    | live, reconciled book (282 trades, mixed config) | 33 | -$690.91 | — |
+                    | live, current era only (24 trades) | 7 | -$118.17 | — |
+
+                    The sim W1 figure is the one the arm is measured against;
+                    the other two are context. They are **not** the same book
+                    and must never be summed. The current-era live slice is
+                    n=7 and cannot support anything on its own.
+- **Remedy**      : `REMEDY_KB.md` § `SIGNAL_FALSE` → **R1**. Require the
+                    sweeping candle's wick beyond the level to be at least
+                    `MIN_WICK_RATIO` of that candle's total range before
+                    `SATriggerEngine._check_sweep_rejection` admits the setup.
+                    `(high - max(open,close)) / range` for a buy-side sweep,
+                    `(min(open,close) - low) / range` for a sell-side one.
+                    **Sweep the threshold 35 / 45 / 55.** Do not adopt 45
+                    because an article said so.
+- **Evidence**    : **Grade C — design only** (CLAUDE.md §13.7). MQL5 art.
+                    22140 ships a full detector around `MIN_WICK_RATIO = 45`
+                    and publishes **no** win rate, profit factor, trade count
+                    or date range — a screenshot and a tester GIF. The
+                    threshold is a starting value, not a validated one. Per the
+                    vault's §6 ladder this is a **hypothesis**, not a finding.
+- **Hypothesis**  : *stated before the run.* The detector currently qualifies a
+                    sweep on two conditions — any low in the last 4 bars
+                    pierced the level, and the last bar closes back through it
+                    — with **no requirement that the piercing candle rejected
+                    anything**, and no freshness link between the piercing bar
+                    and the rejection bar. A shallow two-pip tag is therefore
+                    admitted on identical terms to a violent rejection. The
+                    prediction: requiring a real wick removes a
+                    disproportionate share of `SIGNAL_FALSE` trades, whose mean
+                    MFE of 0.17R says they never go onside, and the trades it
+                    keeps carry a higher avgR by enough to pay for the volume
+                    given up.
+- **Rejection criteria** : *also stated before the run — any one of these
+                    rejects the remedy.*
+
+                    1. **Sign flip across the two disjoint windows.** Same sign
+                       in W1 and W2 or it is rejected. **This supersedes the
+                       acceptance test written in `REMEDY_KB.md`,** which still
+                       says "all three chronological folds": §13.12 retired
+                       60/20/20 as a within-window stability test carrying *no*
+                       cross-regime information — it fired in 4 of 14 windows
+                       and those four split +$904 / +$1187 / -$172 / -$680.
+                       Folds may be reported; they cannot promote.
+                    2. **The EMA-band failure shape** (§13.8): removing losers
+                       *and* profitable trades. A rise in win rate bought with
+                       a fall in net and sumR is a rejection, not a result.
+                    3. **`sumR` falls** even where net $ rises, or vice versa
+                       without explanation (§13.15 — a dollar delta conflates
+                       trade selection with compounding; on 205 shared bars
+                       with identical prices and zero trigger changes, dollars
+                       differed by $1153 while sumR differed by 0.004).
+                    4. **The quality-without-payment shape** (L-015): avgR up,
+                       net down. `CONFLUENCE_ONLY` lifted avgR 24% while
+                       cutting trades 38% and lost $835.65.
+- **Known risk**  : 276 of 280 W1 trades come from `SWEEP_REJECTION`. This
+                    filter moves the **whole book**, not a corner of it. The
+                    likely failure shape is a small win-rate gain bought with a
+                    large trade-count loss.
+- **Arm**         : W1 and W2, identical flags, filter default-off. Each window
+                    is compared against its own baseline run with byte-identical
+                    flags, never against a remembered figure, and the spread
+                    floor is stated on every run (§13.12 — the archive cannot
+                    supply one, and raising it 2.5 -> 5.0 cost $1264, 36% of the
+                    headline).
+
+                    W1: `py -3.14 -E backtest_scalper.py --from 2026-05-15T00:00:00 --to 2026-08-23T00:00:00 --pool 1000 --risk 0.03 --symbols XAUUSD --loss-limit 100.0 --incidents logs/sim_incidents.jsonl --out logs/bt_L016_w1_THR.json`
+
+                    W2: `py -3.14 -E backtest_scalper.py --from 2025-08-01T00:00:00 --to 2026-05-14T00:00:00 --pool 1000 --risk 0.03 --symbols XAUUSD --loss-limit 100.0 --incidents logs/sim_incidents.jsonl --out logs/bt_L016_w2_THR.json`
+- **Must report** : net $ **and** sumR side by side (§13.15); trade counts;
+                    `LOT_FLOOR` and every rejection counter (§13.9 — an arm
+                    that changes the admitted sample is measuring a different
+                    book); the `SIGNAL_FALSE` count itself; **the number of
+                    WINNERS that fail the wick test** — per the attribution
+                    trap this is the question that decides it, and an answer of
+                    "I did not count" means there is no finding; and the count
+                    of **NEW** trades the arm takes that the baseline does not.
+                    L-015: a pure veto still created 15 new trades running
+                    6.67% WR and -$605.11, because vetoing frees a position
+                    slot and skips a cooldown.
+- **Result**      : **NOT RUN.** No data exists for this entry.
+- **Verdict**     : **PROPOSED.**
+- **Notes**       : three things this entry does not claim.
+
+                    1. It does not claim the remedy will work. Grade C is a
+                       hypothesis; §13.12 downgraded every REJECTED verdict in
+                       this ledger precisely because each was decided on a few
+                       hundred dollars from a distribution centred on zero, and
+                       the same caveat will apply to this one's result.
+                    2. It does not claim `SIGNAL_FALSE` is the biggest leak.
+                       It is the biggest *addressable entry-side* leak. The
+                       largest known defect remains **L-012 execution
+                       slippage** — a 2.8% reward haircut against a 2.9% gross
+                       margin — which no entry-side gate can touch, and which
+                       is blocked behind L-003.
+                    3. It does not depend on the Stage 0 telemetry. The wick
+                       ratio is arithmetic on bars already in hand. The
+                       telemetry unblocks a *different* question (confidence
+                       tier x HTF agreement) that remains partly unmeasurable —
+                       see the `htf_trend` gap recorded in
+                       `wiki/synthesis/open-questions.md`.
