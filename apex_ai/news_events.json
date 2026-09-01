@@ -1,38 +1,8 @@
 [
   {
-    "time_utc": "2026-08-26T01:30:00Z",
+    "time_utc": "2026-09-01T14:00:00Z",
     "impact": "HIGH",
-    "title": "AUD CPI m/m",
-    "symbols": [
-      "AUDUSD",
-      "EURAUD",
-      "AUDJPY"
-    ]
-  },
-  {
-    "time_utc": "2026-08-26T01:30:00Z",
-    "impact": "HIGH",
-    "title": "AUD CPI y/y",
-    "symbols": [
-      "AUDUSD",
-      "EURAUD",
-      "AUDJPY"
-    ]
-  },
-  {
-    "time_utc": "2026-08-26T01:30:00Z",
-    "impact": "HIGH",
-    "title": "AUD Trimmed Mean CPI m/m",
-    "symbols": [
-      "AUDUSD",
-      "EURAUD",
-      "AUDJPY"
-    ]
-  },
-  {
-    "time_utc": "2026-08-26T12:30:00Z",
-    "impact": "HIGH",
-    "title": "USD Core PCE Price Index m/m",
+    "title": "USD ISM Manufacturing PMI",
     "symbols": [
       "XAUUSD",
       "XAGUSD",
@@ -51,39 +21,108 @@
     ]
   },
   {
-    "time_utc": "2026-08-26T12:30:00Z",
+    "time_utc": "2026-09-02T01:30:00Z",
     "impact": "HIGH",
-    "title": "USD Prelim GDP q/q",
+    "title": "AUD GDP q/q",
     "symbols": [
-      "XAUUSD",
-      "XAGUSD",
-      "USOIL",
-      "BTCUSD",
-      "EURUSD",
-      "GBPUSD",
-      "USDJPY",
-      "USDCHF",
-      "USDCAD",
       "AUDUSD",
-      "NZDUSD",
-      "US30",
-      "NAS100",
-      "SPX500"
+      "EURAUD",
+      "AUDJPY"
     ]
   },
   {
-    "time_utc": "2026-08-28T12:30:00Z",
+    "time_utc": "2026-09-02T02:00:00Z",
     "impact": "HIGH",
-    "title": "CAD GDP m/m",
+    "title": "NZD Official Cash Rate",
+    "symbols": [
+      "NZDUSD"
+    ]
+  },
+  {
+    "time_utc": "2026-09-02T02:00:00Z",
+    "impact": "HIGH",
+    "title": "NZD RBNZ Monetary Policy Statement",
+    "symbols": [
+      "NZDUSD"
+    ]
+  },
+  {
+    "time_utc": "2026-09-02T02:00:00Z",
+    "impact": "HIGH",
+    "title": "NZD RBNZ Rate Statement",
+    "symbols": [
+      "NZDUSD"
+    ]
+  },
+  {
+    "time_utc": "2026-09-02T03:00:00Z",
+    "impact": "HIGH",
+    "title": "NZD RBNZ Press Conference",
+    "symbols": [
+      "NZDUSD"
+    ]
+  },
+  {
+    "time_utc": "2026-09-02T13:45:00Z",
+    "impact": "HIGH",
+    "title": "CAD BOC Rate Statement",
     "symbols": [
       "USDCAD",
       "USOIL"
     ]
   },
   {
-    "time_utc": "2026-08-28T14:00:00Z",
+    "time_utc": "2026-09-02T13:45:00Z",
     "impact": "HIGH",
-    "title": "USD Fed Chairman Warsh Speaks",
+    "title": "CAD Overnight Rate",
+    "symbols": [
+      "USDCAD",
+      "USOIL"
+    ]
+  },
+  {
+    "time_utc": "2026-09-02T14:30:00Z",
+    "impact": "HIGH",
+    "title": "CAD BOC Press Conference",
+    "symbols": [
+      "USDCAD",
+      "USOIL"
+    ]
+  },
+  {
+    "time_utc": "2026-09-04T08:50:00Z",
+    "impact": "HIGH",
+    "title": "GBP BOE Gov Bailey Speaks",
+    "symbols": [
+      "GBPUSD",
+      "EURGBP",
+      "GBPJPY",
+      "GBPCHF",
+      "XAUUSD"
+    ]
+  },
+  {
+    "time_utc": "2026-09-04T12:30:00Z",
+    "impact": "HIGH",
+    "title": "CAD Employment Change",
+    "symbols": [
+      "USDCAD",
+      "USOIL"
+    ]
+  },
+  {
+    "time_utc": "2026-09-04T12:30:00Z",
+    "impact": "HIGH",
+    "title": "CAD Unemployment Rate",
+    "symbols": [
+      "USDCAD",
+      "USOIL"
+    ]
+  },
+  {
+    "time_utc": "2026-09-04T12:30:00Z",
+    "impact": "HIGH",
+    "title": "USD Average Hourly Earnings m/m",
     "symbols": [
       "XAUUSD",
       "XAGUSD",
@@ -102,9 +141,9 @@
     ]
   },
   {
-    "time_utc": "2026-08-28T14:00:00Z",
+    "time_utc": "2026-09-04T12:30:00Z",
     "impact": "HIGH",
-    "title": "USD Prelim Benchmark Payrolls Revision",
+    "title": "USD Non-Farm Employment Change",
     "symbols": [
       "XAUUSD",
       "XAGUSD",
@@ -123,9 +162,24 @@
     ]
   },
   {
-    "time_utc": "2026-08-28T16:15:00Z",
+    "time_utc": "2026-09-04T12:30:00Z",
     "impact": "HIGH",
-    "title": "ALL Jackson Hole Symposium",
-    "symbols": []
+    "title": "USD Unemployment Rate",
+    "symbols": [
+      "XAUUSD",
+      "XAGUSD",
+      "USOIL",
+      "BTCUSD",
+      "EURUSD",
+      "GBPUSD",
+      "USDJPY",
+      "USDCHF",
+      "USDCAD",
+      "AUDUSD",
+      "NZDUSD",
+      "US30",
+      "NAS100",
+      "SPX500"
+    ]
   }
 ]
