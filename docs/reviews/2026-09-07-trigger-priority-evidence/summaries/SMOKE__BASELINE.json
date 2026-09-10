@@ -1,0 +1,174 @@
+{
+  "window": "SMOKE",
+  "arm": "BASELINE",
+  "start": "2026-09-04 00:00:00+00:00",
+  "end_exclusive": "2026-09-05 00:00:00+00:00",
+  "trades": 1,
+  "pnl": -32.04,
+  "ending_balance": 967.96,
+  "gross_pnl": -30.64,
+  "win_rate_pct": 0.0,
+  "profit_factor": 0.0,
+  "sum_net_r": -1.038573743922204,
+  "max_closed_balance_drawdown": 32.04,
+  "max_closed_balance_drawdown_pct": 3.203999999999996,
+  "cost_overlay_fixed_trades": {
+    "0.17": -31.32,
+    "0.35": -32.04,
+    "0.75": -33.64
+  },
+  "folds": [
+    {
+      "trades": 1,
+      "pnl": -32.04,
+      "ending_balance": 967.96,
+      "gross_pnl": -30.64,
+      "win_rate_pct": 0.0,
+      "profit_factor": 0.0,
+      "sum_net_r": -1.038573743922204,
+      "max_closed_balance_drawdown": 32.04,
+      "max_closed_balance_drawdown_pct": 3.203999999999996,
+      "cost_overlay_fixed_trades": {
+        "0.17": -31.32,
+        "0.35": -32.04,
+        "0.75": -33.64
+      }
+    },
+    {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    }
+  ],
+  "trigger_breakdown": {
+    "HTF_CRT_SWEEP": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "FVG_FILL": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "SWEEP_REJECTION": {
+      "trades": 1,
+      "pnl": -32.04,
+      "ending_balance": 967.96,
+      "gross_pnl": -30.64,
+      "win_rate_pct": 0.0,
+      "profit_factor": 0.0,
+      "sum_net_r": -1.038573743922204,
+      "max_closed_balance_drawdown": 32.04,
+      "max_closed_balance_drawdown_pct": 3.203999999999996,
+      "cost_overlay_fixed_trades": {
+        "0.17": -31.32,
+        "0.35": -32.04,
+        "0.75": -33.64
+      }
+    },
+    "BOS_RETEST": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "JUDAS": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    }
+  },
+  "triggers_detected": {
+    "SWEEP_REJECTION": 31
+  },
+  "rejections": {
+    "SESSION": 210,
+    "RECLAIM_WAIT_LEVEL": 21,
+    "COOLDOWN": 7,
+    "RECLAIM_WAIT_FVG": 6,
+    "SYMBOL_DEDUP": 4,
+    "RECLAIM_WAIT_RETURN": 3
+  },
+  "arbitration_overlaps": {
+    "SWEEP_REJECTION > BOS_RETEST > JUDAS": 7,
+    "SWEEP_REJECTION > BOS_RETEST": 12,
+    "SWEEP_REJECTION > JUDAS": 6
+  },
+  "possible_promotions": {
+    "BOS_RETEST": 19,
+    "JUDAS": 13
+  },
+  "arbitration_switches": 0,
+  "elapsed_seconds": 2.63072480000028
+}

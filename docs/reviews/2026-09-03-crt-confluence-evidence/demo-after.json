@@ -1,0 +1,13 @@
+{
+  "at_utc": "2026-09-03T05:54:15.367301+00:00",
+  "demo": true,
+  "positions": [],
+  "source_hashes": {
+    "scalper_agent.py": "ad7e29eedbb436b5072ab4b2c8a8c60bb40131e16c795509c746eb0554e0ea53",
+    "trade_guardian_agent.py": "1f405700419f0f16cd535acdb8bc250f7ae7668f91deb0473bb0d722707101b4",
+    "scalper/decision_params.py": "9f065e3ed366a4d7af0d6ebca0535a67f2d2ce91102c258cbbd4caf7aabc6bb4",
+    "scalper/htf_crt.py": "69db2a07bd647c9d3871bff47b9bd64ece4b82c3120a91468a00a3bef967b954",
+    "scalper/crt_confluence.py": "6282390f36494f48fb46d1fb0ef92c9709ff41d56aa25c4ef7eb4c25e92702a4",
+    "backtest_scalper.py": "b43d0583054f51bf8e887dd4fdb9b0d3d82a077e457c54516cbebe952f92e0c1"
+  }
+}

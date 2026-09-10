@@ -1,0 +1,14 @@
+..D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\trade_guardian_agent.py:42: ResourceWarning: unclosed file <_io.TextIOWrapper name='D:\\Hermes Quant\\Quant GPT Test Claude - Final\\apex_ai\\logs\\tga_log.txt' mode='a' encoding='utf-8'>
+  logging.basicConfig(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+2026-09-03 05:05:52,087Z [SA.CRG] INFO: SA-CRG: All checks passed — trade APPROVED
+2026-09-03 05:05:52,127Z [SA.CRG] INFO: SA-CRG: All checks passed — trade APPROVED
+2026-09-03 05:05:52,164Z [SA.CRG] INFO: SA-CRG: All checks passed — trade APPROVED
+2026-09-03 05:05:52,203Z [SA.CRG] INFO: SA-CRG: All checks passed — trade APPROVED
+2026-09-03 05:05:52,243Z [SA.CRG] INFO: SA-CRG: All checks passed — trade APPROVED
+2026-09-03 05:05:52,290Z [SA.CRG] INFO: SA-CRG: All checks passed — trade APPROVED
+........................
+----------------------------------------------------------------------
+Ran 26 tests in 6.209s
+
+OK

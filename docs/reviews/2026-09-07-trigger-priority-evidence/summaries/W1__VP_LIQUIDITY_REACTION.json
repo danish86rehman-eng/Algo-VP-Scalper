@@ -1,0 +1,180 @@
+{
+  "window": "W1",
+  "arm": "VP_LIQUIDITY_REACTION",
+  "start": "2026-03-01 00:00:00+00:00",
+  "end_exclusive": "2026-06-01 00:00:00+00:00",
+  "trades": 35,
+  "pnl": -186.34,
+  "ending_balance": 813.66,
+  "gross_pnl": -153.09,
+  "win_rate_pct": 42.857142857142854,
+  "profit_factor": 0.6747311827956989,
+  "sum_net_r": -6.410962241252436,
+  "max_closed_balance_drawdown": 256.21,
+  "max_closed_balance_drawdown_pct": 23.947769355155327,
+  "cost_overlay_fixed_trades": {
+    "0.17": -169.24,
+    "0.35": -186.34,
+    "0.75": -224.34
+  },
+  "folds": [
+    {
+      "trades": 15,
+      "pnl": -28.55,
+      "ending_balance": 971.45,
+      "gross_pnl": -14.55,
+      "win_rate_pct": 46.666666666666664,
+      "profit_factor": 0.8763962247813665,
+      "sum_net_r": -0.9523224263300633,
+      "max_closed_balance_drawdown": 98.42,
+      "max_closed_balance_drawdown_pct": 9.19924850682794,
+      "cost_overlay_fixed_trades": {
+        "0.17": -21.35,
+        "0.35": -28.55,
+        "0.75": -44.55
+      }
+    },
+    {
+      "trades": 10,
+      "pnl": 43.95,
+      "ending_balance": 1043.95,
+      "gross_pnl": 55.5,
+      "win_rate_pct": 60.0,
+      "profit_factor": 1.4053306280549662,
+      "sum_net_r": 1.2503603228115439,
+      "max_closed_balance_drawdown": 40.83,
+      "max_closed_balance_drawdown_pct": 3.7897140311308024,
+      "cost_overlay_fixed_trades": {
+        "0.17": 49.89,
+        "0.35": 43.95,
+        "0.75": 30.75
+      }
+    },
+    {
+      "trades": 10,
+      "pnl": -201.74,
+      "ending_balance": 798.26,
+      "gross_pnl": -194.04,
+      "win_rate_pct": 20.0,
+      "profit_factor": 0.1359061121343213,
+      "sum_net_r": -6.709000137733917,
+      "max_closed_balance_drawdown": 201.74,
+      "max_closed_balance_drawdown_pct": 20.174,
+      "cost_overlay_fixed_trades": {
+        "0.17": -197.78,
+        "0.35": -201.74,
+        "0.75": -210.54
+      }
+    }
+  ],
+  "trigger_breakdown": {
+    "HTF_CRT_SWEEP": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "FVG_FILL": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "SWEEP_REJECTION": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "BOS_RETEST": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "JUDAS": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    }
+  },
+  "triggers_detected": {
+    "VP_LIQUIDITY_REACTION": 1631
+  },
+  "rejections": {
+    "SESSION": 11509,
+    "NO_TRIGGER": 4111,
+    "VPLR_FUNNEL:raid without reclaim/MSS/confluence": 1423,
+    "RECLAIM_WAIT_LEVEL": 1123,
+    "SYMBOL_DEDUP": 296,
+    "M15_FVG_CONSUMED": 249,
+    "RECLAIM_WAIT_DISPLACEMENT": 142,
+    "RECLAIM_WAIT_FVG": 138,
+    "COOLDOWN": 106,
+    "RECLAIM_RETURN_STALE": 75,
+    "M15_FVG_NO_STRUCTURAL_TARGET": 57,
+    "M15_FVG_TARGET_R_TOO_SMALL": 46,
+    "RECLAIM_WAIT_RETURN": 45,
+    "STEP3": 40,
+    "M15_FVG_HISTORY_MISSING": 35,
+    "LOT_FLOOR": 13,
+    "RECLAIM_FVG_INVALIDATED": 10,
+    "RECLAIM_RETURN_UNCONFIRMED": 7,
+    "RECLAIM_INVALID_GEOMETRY": 3
+  },
+  "arbitration_overlaps": {},
+  "possible_promotions": {},
+  "arbitration_switches": 0,
+  "elapsed_seconds": 298.5920667999999
+}

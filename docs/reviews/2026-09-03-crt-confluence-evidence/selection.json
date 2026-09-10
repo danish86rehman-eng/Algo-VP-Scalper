@@ -1,0 +1,68 @@
+{
+  "MSS": {
+    "accepted": {
+      "n": 0,
+      "pnl": 0.0,
+      "gross_pnl": 0.0,
+      "mean_net_r": null,
+      "mean_gross_r": null,
+      "sum_net_r": 0.0,
+      "profit_factor": null,
+      "mean_inverse_stop": null,
+      "cost_sensitivity_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "rejected": {
+      "n": 0,
+      "pnl": 0.0,
+      "gross_pnl": 0.0,
+      "mean_net_r": null,
+      "mean_gross_r": null,
+      "sum_net_r": 0.0,
+      "profit_factor": null,
+      "mean_inverse_stop": null,
+      "cost_sensitivity_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "status": "INSUFFICIENT_SELECTION_EVIDENCE"
+  },
+  "MSS_RETEST": {
+    "accepted": {
+      "n": 0,
+      "pnl": 0.0,
+      "gross_pnl": 0.0,
+      "mean_net_r": null,
+      "mean_gross_r": null,
+      "sum_net_r": 0.0,
+      "profit_factor": null,
+      "mean_inverse_stop": null,
+      "cost_sensitivity_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "rejected": {
+      "n": 0,
+      "pnl": 0.0,
+      "gross_pnl": 0.0,
+      "mean_net_r": null,
+      "mean_gross_r": null,
+      "sum_net_r": 0.0,
+      "profit_factor": null,
+      "mean_inverse_stop": null,
+      "cost_sensitivity_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "status": "INSUFFICIENT_SELECTION_EVIDENCE"
+  }
+}

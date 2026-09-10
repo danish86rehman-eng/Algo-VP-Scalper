@@ -1,0 +1,15 @@
+{
+  "verified_at_utc": "2026-09-02T13:11:34.311500+00:00",
+  "trade_mode": "DEMO",
+  "positions": [
+    {
+      "ticket": 494933044,
+      "symbol": "XAUUSD",
+      "magic": 88880,
+      "volume": 0.01,
+      "price_open": 4332.523,
+      "sl": 4303.498,
+      "tp": 4367.404
+    }
+  ]
+}

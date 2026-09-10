@@ -1,0 +1,24 @@
+{
+  "captured_at": "2026-09-02T13:28:30.607059+00:00",
+  "account_mode": "DEMO",
+  "screenshot_sha256": "235c16b61773aa38fe17575a1850eb315c22b8bf81a92fc60bc441f3a8739b46",
+  "screenshot": "D:\\OneDrive - Orient Petroleum\\Personal\\Obsidian\\AI-Trading-Strategies\\journal\\reviews\\assets\\xauusd-m15-fvg-2026-09-02-1302-utc.png",
+  "windows": [
+    {
+      "label": "first",
+      "start": "2026-09-02T04:15:00+00:00",
+      "end": "2026-09-02T04:31:00+00:00",
+      "ticks": 2243,
+      "min_bid": 4301.307,
+      "min_ask": 4301.357
+    },
+    {
+      "label": "second",
+      "start": "2026-09-02T10:00:00+00:00",
+      "end": "2026-09-02T10:16:00+00:00",
+      "ticks": 2740,
+      "min_bid": 4301.851,
+      "min_ask": 4301.901
+    }
+  ]
+}

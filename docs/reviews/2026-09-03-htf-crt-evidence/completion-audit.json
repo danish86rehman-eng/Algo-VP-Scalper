@@ -1,0 +1,18 @@
+{
+  "D1_W1_MN1_actual_trigger": true,
+  "both_BSL_SSL_directions_tested": true,
+  "first_priority_selector_and_idle_watch": true,
+  "displacement_FVG_return_required": true,
+  "cost_risk_session_and_L017_retained": true,
+  "live_backtest_shared": true,
+  "broker_setup_recovery_and_TGA_target_cap": true,
+  "vault_recorded": true,
+  "full_tests": 473,
+  "demo_reload_verified": true,
+  "profitability": "unverified",
+  "limitations": [
+    "M15 raid must be observable within the existing 150-bar window",
+    "M5 opening observations do not prove all intrabar executable fills",
+    "No out-of-sample efficacy or real-money promotion"
+  ]
+}

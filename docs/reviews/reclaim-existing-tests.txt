@@ -1,0 +1,59 @@
+2026-09-02 12:58:43,025Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $+0.00 -> hold until 12:00 UTC (1800s)
+2026-09-02 12:58:43,025Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-2.00 -> hold until 12:00 UTC (2700s)
+2026-09-02 12:58:43,026Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-12.50 -> hold until 12:00 UTC (2700s)
+2026-09-02 12:58:43,026Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-3.00 -> hold until 12:00 UTC (300s)
+2026-09-02 12:58:43,026Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-1.00 -> hold until 12:00 UTC (3600s)
+2026-09-02 12:58:43,026Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-5.00 -> hold until 00:00 UTC (1200s)
+2026-09-02 12:58:43,026Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-10.00 -> hold until 12:00 UTC (2700s)
+2026-09-02 12:58:43,027Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-1.00 -> hold until 12:00 UTC (2700s)
+2026-09-02 12:58:43,027Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-10.00 -> hold until 12:00 UTC (2700s)
+2026-09-02 12:58:43,027Z [SA.Cooldown] WARNING: SA Cooldown restored from history: holds until 12:00 UTC (480s left)
+2026-09-02 12:58:43,028Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-1.00 -> hold until 12:00 UTC (1800s)
+2026-09-02 12:58:43,028Z [SA.Cooldown] INFO: SA Cooldown armed: WIN $+8.00 -> 5m break (300s)
+2026-09-02 12:58:43,028Z [SA.Cooldown] INFO: SA Cooldown armed: WIN $+1.00 -> 12m break (720s)
+2026-09-02 12:58:43,029Z [SA.Cooldown] INFO: SA Cooldown armed: WIN $+4.00 -> 5m break (300s)
+2026-09-02 12:58:43,227Z [SA.Postmortem] WARNING: skipping malformed incident line
+2026-09-02 12:58:43,236Z [SA.Postmortem] WARNING: postmortem failed for ticket 1: could not convert string to float: 'not-a-number'
+2026-09-02 12:58:43,263Z [SA.Rejects] WARNING: unreadable rejection log at C:\Users\NAUMAN~1.ORI\AppData\Local\Temp\tmpdd4wa15h\rej.json — starting fresh
+2026-09-02 12:58:43,549Z [SA.State] INFO: SA State: IDLE -> PROTECTED | Main account DD 9.0% > 3% threshold
+2026-09-02 12:58:43,549Z [SA.State] INFO: SA State: IDLE -> HALTED | Daily loss limit hit (2% of SA pool)
+2026-09-02 12:58:43,549Z [SA.State] INFO: SA State: IDLE -> PAUSED | 2 consecutive losses — 15-min pause active
+2026-09-02 12:58:43,550Z [SA.State] INFO: SA State: IDLE -> ACTIVE | Session active, all checks clear
+2026-09-02 12:58:43,550Z [SA.State] INFO: SA State: IDLE -> VP_ONLY | Outside SA session window; VP-only allowance open
+EE...........................................................................................................................................................................................................................................................................................................................................................
+======================================================================
+ERROR: test_backtest_fidelity (unittest.loader._FailedTest.test_backtest_fidelity)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_backtest_fidelity
+Traceback (most recent call last):
+  File "C:\Users\nauman.afzal.ORIENTPET\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\loader.py", line 426, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "C:\Users\nauman.afzal.ORIENTPET\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\loader.py", line 367, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\tests\test_backtest_fidelity.py", line 18, in <module>
+    from backtest_scalper import (
+    ...<6 lines>...
+    )
+ModuleNotFoundError: No module named 'backtest_scalper'
+
+
+======================================================================
+ERROR: test_close_paths (unittest.loader._FailedTest.test_close_paths)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_close_paths
+Traceback (most recent call last):
+  File "C:\Users\nauman.afzal.ORIENTPET\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\loader.py", line 426, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "C:\Users\nauman.afzal.ORIENTPET\AppData\Local\Python\pythoncore-3.14-64\Lib\unittest\loader.py", line 367, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\tests\test_close_paths.py", line 29, in <module>
+    import scalper_agent
+ModuleNotFoundError: No module named 'scalper_agent'
+
+
+----------------------------------------------------------------------
+Ran 349 tests in 0.531s
+
+FAILED (errors=2)

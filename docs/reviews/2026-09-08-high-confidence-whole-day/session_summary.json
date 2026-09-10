@@ -1,0 +1,56 @@
+[
+  {
+    "session": "TOKYO_OPEN",
+    "trades": 35,
+    "profit": 569.01,
+    "loss": -542.52,
+    "net": 26.49,
+    "W1": -143.13,
+    "W2": 169.62
+  },
+  {
+    "session": "PRE_LONDON",
+    "trades": 5,
+    "profit": 39.14,
+    "loss": -88.15,
+    "net": -49.01,
+    "W1": 0,
+    "W2": -49.01
+  },
+  {
+    "session": "LONDON_OPEN",
+    "trades": 16,
+    "profit": 193.53,
+    "loss": -248.37,
+    "net": -54.84,
+    "W1": -92.81,
+    "W2": 37.97
+  },
+  {
+    "session": "LONDON_NY",
+    "trades": 18,
+    "profit": 218.12,
+    "loss": -319.32,
+    "net": -101.2,
+    "W1": 37.32,
+    "W2": -138.52
+  },
+  {
+    "session": "NY_LUNCH_REV",
+    "trades": 6,
+    "profit": 51.82,
+    "loss": -99.57,
+    "net": -47.75,
+    "W1": -99.57,
+    "W2": 51.82
+  },
+  {
+    "session": "Whole_day",
+    "trades": 213,
+    "profit": 2736.97,
+    "loss": -2442.36,
+    "net": 294.61,
+    "W1": 426.69,
+    "W2": -132.08
+  }
+]

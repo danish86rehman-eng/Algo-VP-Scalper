@@ -1,0 +1,17 @@
+{
+  "verified_at": "2026-09-02T13:40:43.629896+00:00",
+  "account_mode": "DEMO",
+  "configuration_era": "2026-09-02-m15-fvg-target",
+  "positions": [],
+  "code_sha256": {
+    "apex_ai/scalper/m15_fvg_entry.py": "5cd17c176e3bc4369f6a9234e2f8daf19e1768c4ca1d9b94a60d23192d2dd2b2",
+    "apex_ai/scalper/reclaim_fvg.py": "65b97962634029ba80498bbff063540b233b1e84274065c0946e4b27f8693377",
+    "apex_ai/scalper/decision_params.py": "089277b2aa58af2608016212a94dbeaae96d2ce5faf2d923021e091d0c0fd38b",
+    "apex_ai/scalper/trigger_engine.py": "6728536fe5beda1863df21158eda4201847ae8f78f8cc7d1dee5282e5a4e9ae8",
+    "apex_ai/scalper_agent.py": "cf7df521b6cbb0dd261351de686d17bc7d85f84ad7c88f32a6df6e1b04fd5f34",
+    "apex_ai/trade_guardian_agent.py": "9c7ba9f922df921e9a5a0d95bf07f04061b06d27ea15d9cc89dba8546cbf503f",
+    "apex_ai/scalper/exit_manager.py": "4f68df8eaecc5b83b3d6b091d19bde8c06f094592fd1c4aabd87b8586b71b1f6",
+    "apex_ai/backtest_scalper.py": "2d9180f6b295049e13953dced2caf452ac0bdbbf26b4529e27b25542163dc06c",
+    "apex_ai/tests/test_m15_fvg_entry.py": "797842b9e183c00b163b2a57f50b1565e5d11a3f492884acb396fc17cfa2516f"
+  }
+}

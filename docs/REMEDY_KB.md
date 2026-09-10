@@ -267,3 +267,36 @@ Grades reflect what each source *provides*, not its usefulness.
 [19911]: https://www.mql5.com/en/articles/19911
 [22140]: https://www.mql5.com/en/articles/22140
 [18379]: https://www.mql5.com/en/articles/18379
+
+
+## R7 — reversal-exit invalidation, support-role state and incremental intraday VP
+
+**Added 2026-09-02; core reclaim/FVG restriction IMPLEMENTED under operator demo mandate; efficacy unverified; VP extension PROPOSED; ledger L-017.** Targets repeated `SIGNAL_FALSE` candidates after a Guardian reversal exit. The motivating incident has one losing re-entry and its preceding winner; recurrence and performance improvement are unestablished.
+
+Broker 494903819 was closed for bearish engulfing at net +$15.73; five minutes later 494906413 bought on a pre-exit M15 sweep and lost $27.18. Both signals reproduced exactly. The 45% sweep-wick remedy R1 would reject the winner and retain the loser, so it is not the cure for this incident.
+
+1. Keep exit reason and reversal/setup identity separate from profit sign. Following a reversal exit, a same-direction entry must use a new closed trigger bar after the exit and a new valid structural setup; a cooldown expiry or a changed nearest equal-low number cannot revive the old one.
+2. Track a frozen support/resistance zone through confirmed break, retest and successful/failed reclaim; evaluate both directions with closed M5 confirmation. Define buffers and expiry before any performance experiment. Do not hardcode the observed prices.
+3. Record the intraday profile definition (window, feed, source timeframe, bins, volume type, as-of time), then measure whether it adds to the role-state rule. POC above price alone does not authorize a sell. The reported 4328 POC is not yet independently reproducible.
+
+**Evidence:** exact incident diagnosis, plus design context from Fidelity support/resistance and TradingView VP documentation linked in `APEX_SUPPORT_RETEST_ENHANCEMENT_RECOMMENDATIONS.md`. No causal performance evidence. Full live/backtest parity including `--tga-exits`, costs and position/cooldown path effects is required. Preserve >=2R target geometry and cost gates; do not introduce blanket counter-HTF or no-POC filters on this anecdote.
+
+
+**Implementation update:** `scalper/reclaim_fvg.py` now enforces the operator-defined displacement reclaim and later FVG return at applicable broken levels for all SA entry types, with fresh post-close evidence and a final quote check. 425 tests pass. Definition, diagnostic results and runtime status: `docs/reviews/2026-09-02-reclaim-fvg-correction.md`. The first winning bounce is blocked too; do not report the losing trade alone as saved portfolio profit.
+
+
+**Demo activation verified:** 2 September 13:11:41 UTC (18:11:41 Pakistan), gate ON, five close barriers restored, existing position adopted. Guardian remained running. See the correction report for process, broker and code-hash evidence.
+
+
+## R8 - M15 FVG entry with structural TP (L-018)
+
+Implemented under the operator's demo mandate. Move the entry decision into a confirmed M15 FVG while pricing TP before the nearest broken support/resistance in the profit direction. The existing 0.3 ATR FVG stop and >=2R/cost floors stay binding; skip when the target is too close. The Guardian preserves this structural TP. Source and exact validation: `docs/reviews/2026-09-02-m15-fvg-entry.md`. The motivating 4300 quote was never offered in the recorded revisit windows; no missed-profit claim.
+
+
+## R9 - A prior-period liquidity sweep needs its own entry sequence (L-019)
+
+A PDH/PDL location veto is not a CRT trigger. Use completed native D1/W1/MN1 ranges as frozen anchors, observe an M15 breach from inside, require displacement closing back inside and a resulting confirmed FVG, then a later executable return. Never buy the swept low retrospectively. Stop beyond the raid; target the nearer permissible range/structural objective only if >=2R and costs pass. Persist one-use setup identity and protect the structural target through Guardian restarts. Register the family with selection, bias/regime handling and the replay, otherwise a detector can exist but never trade. All three frames and both directions are implemented; prior CRT research remains negative/inconclusive, and this demo rule has no established edge.
+
+## R10 - External raid confirmation needs an identifiable comparison (L-020)
+
+An external-range sweep, a displacement reclaim, a structural reversal and a completed FVG return are separate observable events. Freeze an opposing swing before the raid and record whether the FVG-producing displacement closes beyond it; record the directional return and its expiry separately. Compare labels on baseline trades, then rerun full risk/cooldown/priority behavior. Use measured costs without charging spread/commission twice. If the baseline yields no eligible CRT entries, more confirmations have no measurable selection effect: retain OBSERVE and diagnose the base conditions rather than claiming a successful filter. L-020's 92-day comparison had zero CRT entries in all three arms; existing whole-bot gains were fold-unstable. Definition and evidence: `docs/reviews/2026-09-03-crt-confluence-review.md`.

@@ -1,0 +1,24 @@
+{
+  "verified_at_utc": "2026-09-02T13:13:04.261611+00:00",
+  "trade_mode": "DEMO",
+  "configuration_era": "2026-09-02-reclaim-fvg",
+  "positions": [
+    {
+      "ticket": 494933044,
+      "symbol": "XAUUSD",
+      "magic": 88880,
+      "volume": 0.01,
+      "price_open": 4332.523,
+      "sl": 4303.498,
+      "tp": 4367.404
+    }
+  ],
+  "code_sha256": {
+    "apex_ai/scalper/reclaim_fvg.py": "cb80a8db4eb65443662100e5183a3134e17855a7644663d3c75724b23f817a92",
+    "apex_ai/scalper/decision_params.py": "62a7e0d1071f6d2a0b164daf61abada8dd4f8c8be5f76508eda59b854f50d574",
+    "apex_ai/scalper/trigger_engine.py": "8cda9236b71f2a1827896d25307a97f3b23170678703f486f5be2efe48d03cf0",
+    "apex_ai/scalper_agent.py": "c833a37d21d98e509e77711cbeb267bdf868218772dc88ec625e0b161123a02c",
+    "apex_ai/backtest_scalper.py": "a916ee8ce9a3f445596d283ba6f4f6df811bea67d70e458e749d1a86a921658a",
+    "apex_ai/tests/test_reclaim_fvg.py": "0196d835a891de28ae5ede1440496c2735e0b90fd2727afd8b72b80eba3f625f"
+  }
+}

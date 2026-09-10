@@ -1,0 +1,174 @@
+{
+  "window": "W1",
+  "arm": "FVG_FILL",
+  "start": "2026-03-01 00:00:00+00:00",
+  "end_exclusive": "2026-06-01 00:00:00+00:00",
+  "trades": 2,
+  "pnl": 88.05,
+  "ending_balance": 1088.05,
+  "gross_pnl": 90.85,
+  "win_rate_pct": 100.0,
+  "profit_factor": null,
+  "sum_net_r": 2.969201495294508,
+  "max_closed_balance_drawdown": 0.0,
+  "max_closed_balance_drawdown_pct": 0.0,
+  "cost_overlay_fixed_trades": {
+    "0.17": 89.49,
+    "0.35": 88.05,
+    "0.75": 84.85
+  },
+  "folds": [
+    {
+      "trades": 1,
+      "pnl": 78.81,
+      "ending_balance": 1078.81,
+      "gross_pnl": 79.86,
+      "win_rate_pct": 100.0,
+      "profit_factor": null,
+      "sum_net_r": 2.6688113782593974,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 79.35,
+        "0.35": 78.81,
+        "0.75": 77.61
+      }
+    },
+    {
+      "trades": 1,
+      "pnl": 9.24,
+      "ending_balance": 1009.24,
+      "gross_pnl": 10.99,
+      "win_rate_pct": 100.0,
+      "profit_factor": null,
+      "sum_net_r": 0.30039011703511054,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 10.14,
+        "0.35": 9.24,
+        "0.75": 7.24
+      }
+    },
+    {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    }
+  ],
+  "trigger_breakdown": {
+    "HTF_CRT_SWEEP": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "FVG_FILL": {
+      "trades": 2,
+      "pnl": 88.05,
+      "ending_balance": 1088.05,
+      "gross_pnl": 90.85,
+      "win_rate_pct": 100.0,
+      "profit_factor": null,
+      "sum_net_r": 2.969201495294508,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 89.49,
+        "0.35": 88.05,
+        "0.75": 84.85
+      }
+    },
+    "SWEEP_REJECTION": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "BOS_RETEST": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "JUDAS": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    }
+  },
+  "triggers_detected": {
+    "FVG_FILL": 9
+  },
+  "rejections": {
+    "SESSION": 14965,
+    "NO_TRIGGER": 2676,
+    "M15_FVG_CONSUMED": 249,
+    "M15_FVG_NO_STRUCTURAL_TARGET": 57,
+    "M15_FVG_TARGET_R_TOO_SMALL": 46,
+    "M15_FVG_HISTORY_MISSING": 35,
+    "RECLAIM_FVG_INVALIDATED": 4,
+    "SYMBOL_DEDUP": 2,
+    "COOLDOWN": 1,
+    "STB": 1,
+    "STB/opposes_short_term": 1,
+    "RECLAIM_RETURN_STALE": 1,
+    "RECLAIM_RETURN_UNCONFIRMED": 1
+  },
+  "arbitration_overlaps": {},
+  "possible_promotions": {},
+  "arbitration_switches": 0,
+  "elapsed_seconds": 461.90012359999946
+}

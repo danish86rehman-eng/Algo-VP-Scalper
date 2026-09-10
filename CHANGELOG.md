@@ -3,6 +3,145 @@
 All notable changes to the APEX AI trading system. Timestamps are UTC.
 Newest first. Every entry states what changed, why, and how it was verified.
 
+## 2026-09-09 11:48 UTC — Restore pre-September 7 scalper confidence behavior
+
+- Restored the demo-era confidence behavior requested by the operator: after the existing STB gate
+  admits a setup, trigger/STB confidence labels no longer impose an additional global HIGH/HIGH
+  requirement. The older thin-liquidity rule still requires HIGH STB confidence during its configured
+  UTC hours.
+- Kept the shared live/backtest policy function so both paths remain identical. Updated the startup
+  policy message and stamped new incidents with configuration era
+  `2026-09-09-pre-high-confidence-restored`. Reclaim/FVG, sessions, risk, targets, cooldown, news,
+  consultant, CRG and Guardian behavior are unchanged.
+- Focused policy tests: 2/2 pass; compileall is clean. Full suite: 504/507, with the same three
+  pre-existing session-window assertion failures documented in the preceding telemetry entry.
+  Reloaded only the flat scalper through its watchdog: PID 15712 became PID 6836. Guardian PID 15704
+  and watchdog PID 10436 remained running. Startup confirms live account 172783529, balance $1007.48,
+  zero open scalper trades, unchanged launch arguments and the restored confidence-policy message.
+
+## 2026-09-09 10:44 UTC — Add immutable scalper execution telemetry
+
+- Added `scalper/execution_telemetry.py`, an independent `execution_telemetry_worker.py`, and watchdog
+  supervision. The scalper emits small nonblocking localhost UDP messages after broker submission;
+  the worker owns all MT5 history calls, calculations and files. Records include tick-native spread,
+  request/deal provenance, latency, adverse implementation shortfall, direction-normalized
+  1/5/15/30/60-second markouts, broker activity/impact proxies and a 60-minute spread-recovery curve.
+- The trading process performs no tick-history query, horizon polling or telemetry file write. If the
+  UDP worker is unavailable, events may be missing while trading continues unchanged. The JSONL and
+  pending file expose no permission-shaped fields. DOM is `UNKNOWN`; VWAP and ICT/SMC/ATR/ADX/DI
+  context have zero voting power.
+- Added 13 execution-telemetry contract tests, including MT5 numpy structured-tick compatibility,
+  nonblocking client behavior, watchdog supervision and source checks preventing history/poll work
+  from returning to the scalper. Focused execution/close/forensics/CRT suite: 78 tests OK.
+  `compileall` and `git diff --check` clean.
+  Full suite: 504 of 507 tests pass; the three remaining failures are the pre-existing dirty-worktree
+  session mismatch where `session_checker.py` uses Tokyo 00:00-06:00 and Pre-London 06:00-07:00 but
+  older VP/session assertions still expect 00:00-02:00 and 06:30-07:00. No process restart or order.
+
+## 2026-09-08 09:44 UTC — Activate operator-selected five-session default
+
+- Updated `apex_ai/tests/test_whitelists.py` to verify all five operator-enabled session boundaries and out-of-window IDLE behavior. Existing explicit whitelist exclusion coverage retained. Full suite: 494 tests OK; compileall clean.
+- Account 172783529 (Exness-MT5Real2) was flat before relaunch, balance/equity $1007.90. Stopped only old scalper PID 6404. Guardian PID 9028 attached at 09:44:23Z; scalper PID 26068 attached at 09:44:38Z. Locks 55555/55556 verified.
+- Scalper arguments retained: `--pool 1000 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH`. New process loads the operator's all-five-session default. HIGH trigger AND HIGH STB policy confirmed in startup output; news loaded 10 events. No proxy configured.
+- Evidence: `apex_ai/logs/relaunch_20260908_tga_stdout.log` and `relaunch_20260908_sa_stdout.log`; corresponding stderr files empty at startup. Updated existing 15-minute monitor to cover all five sessions and these logs.
+
+## 2026-09-07 18:19 UTC — Operator-requested HIGH-only scalper entries
+
+Both trigger confidence and short-term-bias confidence must now equal HIGH.
+Shared `decision_params.entry_confidence_allowed` is enforced after STB in
+`scalper_agent._scan_symbol` and `backtest_scalper.run_backtest`, before
+consultation and execution. Other/unknown ratings fail closed with CONFIDENCE
+rejection telemetry. Trigger precedence and original ratings are preserved:
+MEDIUM-rated CRT and M15 FVG candidates therefore cannot enter under this policy.
+Configuration era: `2026-09-07-high-confidence-only`. This is an operator policy
+change, not a measured profitability improvement.
+
+Verification: 494 tests OK, compileall silent. Added rating-combination and
+live/replay gate-order coverage. Three CRT integration tests explicitly isolate
+their existing execution/confluence plumbing from the new confidence policy.
+Reloaded only scalper PID 13336 as PID 6404 with the existing $1000 FRESH / 3%
+command, after confirming the real account was flat. Guardian PID 12332 stayed
+running. Startup at 18:19:16 UTC confirms `trigger=HIGH AND STB=HIGH required`,
+new era, attach to account 172783529, and IDLE state with Open=0. Ports 55556
+and 55555 match. Evidence: `apex_ai/logs/high_confidence_20260907_stdout.log`
+lines 1, 11-12; matching stderr is empty. Sessions and other settings unchanged.
+
+---
+
+## 2026-09-07 09:46 UTC — Operator-approved Sweep-first trigger precedence
+
+The operator explicitly approved `SWEEP_REJECTION -> HTF_CRT_SWEEP ->
+FVG_FILL -> BOS_RETEST -> JUDAS` after reviewing the separate trigger study.
+Moved only the Sweep consideration to the front of the shared
+`SATriggerEngine.step2_trigger`; live and `backtest_scalper.py` import that
+same engine, so no second decision path or new gate was introduced.
+`VPLR_ENABLED=False` and `VA_FADE_ENABLED=False` remain unchanged and are
+now explicitly pinned for both entry points by the priority regression test.
+Detection, TFs, targets, sessions, risk, cooldowns and Guardian exits unchanged.
+
+Updated the old priority assertions to the operator's new contract, added
+both-direction precedence/fallback and shared-engine/default checks, and added
+a live startup priority/feature-state log. Configuration era is now
+`2026-09-07-sweep-first`. Isolated-copy verification: **492 tests, OK**;
+compileall silent. The original study's snapshots/results remain untouched.
+
+Evidence is **not** a validated profitability promotion: Sweep-first's
+increment versus current precedence was -$7.39 / +$166.02 in the two windows.
+This is an explicit operator policy choice despite that instability.
+Study: `docs/reviews/2026-09-07-trigger-priority-results.md`.
+Activation evidence: `docs/reviews/2026-09-07-sweep-first-activation/`.
+Reload verified at **09:47:16 UTC** on the existing real account: scalper PID
+13336 logs the exact new precedence and both disabled flags. Guardian PID
+12332 remained running; ports 55556/55555 match those processes. Account flat
+before and after, no deals today, pool $1,000, Algo Trading enabled. Command,
+risk and sessions unchanged; see the activation README and startup excerpt.
+
+---
+
+## 2026-09-05 12:00 UTC — Production sessions narrowed to Tokyo and London/NY
+
+Operator-directed strategy-policy change: the Scalper now enables only
+`TOKYO_OPEN` (00:00–02:00 UTC) and `LONDON_NY` (12:00–13:30 UTC) by default.
+`PRE_LONDON`, `LONDON_OPEN`, and `NY_LUNCH_REV` remain valid named windows for
+explicit `--sessions` research runs, but ordinary live and backtest launches
+are IDLE during them. The default lives in the shared `SASessionChecker`, so
+live and simulator use the same gate.
+
+Decision context: broker-net P&L for 2026-08-26 through 2026-09-05 was
+`LONDON_OPEN -$24.16` and `NY_LUNCH_REV -$3.33`; `PRE_LONDON` was **+$73.50**.
+Its removal is therefore an explicit operator restriction, not a finding that
+all three excluded windows lost money, and this short sample does not satisfy
+the chronological fold standard in CLAUDE.md §13.5.
+
+Verified: 18 focused session/allowance tests pass; full discovery passes
+**490 tests**; `py -3.14 -E -m compileall -q .` is silent.
+
+## 2026-09-03 05:53 UTC - CRT confluence measurement and source review (L-020)
+
+Added shared causal M15 MSS and fresh M5 FVG-return confirmation labels, with explicit OBSERVE/MSS/MSS_RETEST modes. Default OBSERVE records evidence without claiming an unvalidated filter improves returns. Strict final submission checks confirmation expiry; transient first-watch data failure retries next cycle. Replay supports a measured XAUUSD total-cost debit replacing spread/commission, with normal spread entry gates retained. 488 tests and compileall pass. Frozen June-August three-arm replay: identical 139 trades, zero eligible CRT candidates/trades; no incremental verdict possible. Whole-bot net +$91.48 / +6.768R is fold-unstable and turns negative under the higher-cost fixed-trade overlay. Source catalogue includes inspected MQL5 report numbers and vault corrections. See `docs/reviews/2026-09-03-crt-confluence-review.md`. Scalper and Guardian reloaded on verified DEMO at 05:53 UTC, mode OBSERVE; no risk/session loosening.
+
+---
+
+## 2026-09-03 05:07 UTC - Priority daily/weekly/monthly CRT sweep trigger
+
+Added operator-requested `HTF_CRT_SWEEP` ahead of existing signals. Shared live/replay detector uses prior completed native D1/W1/MN1 ranges, closed M15 displacement reclaim, confirmed FVG and later quote return. Both directions, true calendar boundaries, no forming-bar leakage, per-symbol broker-restored setup identity, stop beyond raid and range/structure-capped TP under existing >=2R/cost gates. Guardian preserves the target. First watch runs outside entry sessions; execution still requires existing session/news/risk/cooldown permissions. Default enabled for DEMO; era `2026-09-03-htf-crt-trigger`. Prior CRT research remains negative or inconclusive, not evidence of this rule's profitability. Definition, validation and activation: `docs/reviews/2026-09-03-htf-crt-trigger.md`.
+
+---
+
+## 2026-09-02 (2) - M15 FVG entry and fixed structural TP
+
+Operator-requested M15 demand-zone entry, with target before broken structure. Shared live/backtest evaluator uses completed displacement/FVG formation and an executable in-zone quote; no chasing, full mitigation reuse, or nearest-resistance skipping. Existing stop buffer, 2R and cost requirements remain binding. A valid M15 plan precedes a local sweep; the old M5 FVG detector is replaced while the new mode is enabled. TGA recognizes `SA_FVG_M15` and preserves its structural TP across restarts; the simulator mirrors this.
+
+Default enabled, configuration era `2026-09-02-m15-fvg-target`. 447 tests pass; compileall and full-pipeline smoke pass. Actual tick evidence does not support a 4300 fill at the two marked revisits. No profitability claim; entry sessions unchanged pending operator clarification. Definition and relaunch evidence: `docs/reviews/2026-09-02-m15-fvg-entry.md`.
+
+---
+
+## 2026-09-02 - L-017 displacement reclaim and FVG return entry restriction
+
+Operator-requested correction for repeated buys into broken support. A shared closed-bar evaluator now gates every SA trigger: known M15 level break, displacement reclaim, confirmed FVG, then a later completed M5 return. SELL is symmetric. Re-entry requires fresh evidence after the preceding same-direction close, including Guardian exits restored from broker history. The final quote must remain inside the qualified FVG. Default on; config era `2026-09-02-reclaim-fvg`.
+
+Backtest mirrors the evaluator and final quote check and observes M5 confirmation times. Original trigger priority, SL/TP, risk and Guardian exit rules are preserved. Existing L-016 edits are retained with its wick filter off. 425 tests pass, compileall passes, and a bounded Guardian-enabled pipeline smoke completes. Replays block yesterday's loss and both morning buys today, including the winner. Future efficacy is unproven; this is a demo entry-contract correction. See `docs/reviews/2026-09-02-reclaim-fvg-correction.md` for the exact definition and activation record.
+
 ---
 
 ## 2026-08-28 (2) — L-012 re-measured on n=23: the fill haircut is half what n=11 showed

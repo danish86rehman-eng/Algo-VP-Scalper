@@ -1,0 +1,123 @@
+{
+  "whole_bot": {
+    "n": 139,
+    "pnl": 91.48,
+    "gross_pnl": 266.83,
+    "mean_net_r": 0.04869071801114785,
+    "mean_gross_r": 0.08688398634242983,
+    "sum_net_r": 6.768009803549551,
+    "profit_factor": 1.0398326228658763,
+    "mean_inverse_stop": 0.11104746508519642,
+    "cost_sensitivity_fixed_trades": {
+      "0.17": 181.66,
+      "0.35": 91.48,
+      "0.75": -108.92
+    }
+  },
+  "crt": {
+    "n": 0,
+    "pnl": 0.0,
+    "gross_pnl": 0.0,
+    "mean_net_r": null,
+    "mean_gross_r": null,
+    "sum_net_r": 0.0,
+    "profit_factor": null,
+    "mean_inverse_stop": null,
+    "cost_sensitivity_fixed_trades": {
+      "0.17": 0,
+      "0.35": 0,
+      "0.75": 0
+    }
+  },
+  "folds": [
+    {
+      "begin": "2026-06-01 00:00:00+00:00",
+      "end_exclusive": "2026-07-26 04:48:00+00:00",
+      "n": 86,
+      "pnl": 171.87,
+      "gross_pnl": 285.62,
+      "mean_net_r": 0.08165935748078007,
+      "mean_gross_r": 0.11984711864014658,
+      "sum_net_r": 7.022704743347086,
+      "profit_factor": 1.1235514851769848,
+      "mean_inverse_stop": 0.10989424298092428,
+      "cost_sensitivity_fixed_trades": {
+        "0.17": 230.37,
+        "0.35": 171.87,
+        "0.75": 41.87
+      }
+    },
+    {
+      "begin": "2026-07-26 04:48:00+00:00",
+      "end_exclusive": "2026-08-13 14:24:00+00:00",
+      "n": 23,
+      "pnl": -276.15,
+      "gross_pnl": -248.85,
+      "mean_net_r": -0.3023740630454844,
+      "mean_gross_r": -0.26312206447154535,
+      "sum_net_r": -6.954603450046142,
+      "profit_factor": 0.4554650681284878,
+      "mean_inverse_stop": 0.1148679836918196,
+      "cost_sensitivity_fixed_trades": {
+        "0.17": -262.11,
+        "0.35": -276.15,
+        "0.75": -307.35
+      }
+    },
+    {
+      "begin": "2026-08-13 14:24:00+00:00",
+      "end_exclusive": "2026-09-01 00:00:00+00:00",
+      "n": 30,
+      "pnl": 195.76,
+      "gross_pnl": 230.06,
+      "mean_net_r": 0.2233302836749537,
+      "mean_gross_r": 0.26072764604635623,
+      "sum_net_r": 6.699908510248611,
+      "profit_factor": 1.4913654618473895,
+      "mean_inverse_stop": 0.11142430418569883,
+      "cost_sensitivity_fixed_trades": {
+        "0.17": 213.4,
+        "0.35": 195.76,
+        "0.75": 156.56
+      }
+    }
+  ],
+  "candidates": 0,
+  "distinct_candidate_setups": 0,
+  "detected": {
+    "SWEEP_REJECTION": 3636,
+    "JUDAS": 93,
+    "BOS_RETEST": 83,
+    "FVG_FILL": 17
+  },
+  "rejections": {
+    "SESSION": 12984,
+    "RECLAIM_WAIT_LEVEL": 2741,
+    "SYMBOL_DEDUP": 812,
+    "M15_FVG_CONSUMED": 337,
+    "COOLDOWN": 335,
+    "RECLAIM_WAIT_DISPLACEMENT": 310,
+    "RECLAIM_WAIT_FVG": 135,
+    "STB": 118,
+    "NO_TRIGGER": 105,
+    "CONSUL_GATE1_REGIME": 104,
+    "M15_FVG_TARGET_R_TOO_SMALL": 93,
+    "M15_FVG_NO_STRUCTURAL_TARGET": 61,
+    "RECLAIM_WAIT_RETURN": 59,
+    "STB/range_guard": 59,
+    "DAILY_LOSS_LIMIT": 55,
+    "STB/dont_chase": 53,
+    "RECLAIM_RETURN_STALE": 52,
+    "THIN_LIQ": 45,
+    "RECLAIM_INVALID_GEOMETRY": 41,
+    "M15_FVG_HISTORY_MISSING": 40,
+    "CRG": 28,
+    "LOT_FLOOR": 23,
+    "RECLAIM_FVG_INVALIDATED": 18,
+    "STEP3": 10,
+    "RECLAIM_RETURN_UNCONFIRMED": 6,
+    "STB/neutral_needs_direction": 3,
+    "STB/opposes_short_term": 3
+  },
+  "elapsed_seconds": 448.23344680000446
+}

@@ -1,0 +1,23 @@
+{
+  "captured_at_utc": "2026-09-02T12:33:02.585149+00:00",
+  "account_trade_mode": 0,
+  "symbol": "XAUUSD",
+  "source": "Read-only MetaTrader5 history_deals_get and copy_rates_range; application logs separately labelled",
+  "reconstruction": "Closed bars only; as-of cutoff is bar open plus duration <= decision time; sweep wick filter explicitly off; trigger and STB only, not full execution replay",
+  "code_sha256": {
+    "apex_ai\\scalper\\trigger_engine.py": "aa83ba0e5b6d379ef264d1ef192eaee57a99be8bbcb52a4106c69a9463ad9530",
+    "apex_ai\\scalper\\short_term_bias.py": "586f6c38a30026c8ea5c45eed9242086ad4e7aee6741f1c1fc4d0afb205bb560",
+    "apex_ai\\scalper_agent.py": "7cae172172490cc4085275ecb3b1ffdb32fdaf1119de387286c11f3f2c00e240",
+    "apex_ai\\scalper\\decision_params.py": "0e32d6203436459ab7c61e5710cc32b333fafcd9d0c5cb4c93e039561a1176d9"
+  },
+  "user_levels": {
+    "support": 4324,
+    "poc": 4328,
+    "poc_chart_tf": "M15",
+    "profile_start_end_bins": "UNKNOWN"
+  },
+  "notes": [
+    "Application clock is about 14-15 seconds ahead of broker deal times on these fills; preserve both.",
+    "Production files already had uncommitted changes at start; none changed by this review."
+  ]
+}

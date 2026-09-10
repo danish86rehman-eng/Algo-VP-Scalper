@@ -155,11 +155,11 @@ are diagnostic until they clear the 60/20/20 fold test.
 
 ## Session windows (UTC)
 
-London Open 07:00–08:30 · London/NY 12:00–13:30 · Pre-London 06:30–07:00 ·
-Tokyo 00:00–02:00 · NY Lunch 16:30–17:30. The `Whole_day` catch-all is
-**opt-in** (`--allow-whole-day`) and should stay off outside plumbing tests —
-it previously made IDLE unreachable and admitted the Asia volume that carried
-the largest losses.
+Enabled by default: Tokyo 00:00–02:00 and London/NY 12:00–13:30. Defined but
+disabled by default: Pre-London 06:30–07:00, London Open 07:00–08:30, and NY
+Lunch 16:30–17:30. An explicit `--sessions` whitelist can re-enable a named
+window for controlled research. The `Whole_day` catch-all is opt-in only
+(`--allow-whole-day`) and should stay off outside plumbing tests.
 
 ## Where things live
 

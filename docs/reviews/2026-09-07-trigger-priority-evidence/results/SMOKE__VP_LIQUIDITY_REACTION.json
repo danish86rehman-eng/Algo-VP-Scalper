@@ -1,0 +1,177 @@
+{
+  "config": {
+    "symbols": [
+      "XAUUSD"
+    ],
+    "from": "2026-09-04T00:00:00+00:00",
+    "to": "2026-09-04T23:59:59.999999+00:00",
+    "sa_pool": 1000.0,
+    "risk_pct": 0.03,
+    "max_open_positions": 2,
+    "spread_pips_fallback": 6.0,
+    "spread_source": "per-bar MT5 broker spread (fallback where zero)",
+    "spread_pips_observed": {
+      "XAUUSD": {
+        "mean": 4.55,
+        "median": 5.0,
+        "p90": 5.0
+      }
+    },
+    "va_fade_enabled": false,
+    "rd_gate_enabled": false,
+    "rd_gate_mode": "SYMMETRIC",
+    "pdr_gate_enabled": false,
+    "pdr_gate_mode": "SYMMETRIC",
+    "vp_gate_enabled": false,
+    "vp_gate_mode": "RANGING_ONLY",
+    "tga_exits": true,
+    "leg_conf_enabled": false,
+    "leg_conf_mode": "LVN_VETO",
+    "sweep_wick_filter": false,
+    "sweep_wick_ratio": 0.45,
+    "reclaim_fvg_enabled": true,
+    "m15_fvg_entry_enabled": true,
+    "htf_crt_enabled": true,
+    "crt_confluence_mode": "OBSERVE",
+    "watch_inactive_crt": false,
+    "round_trip_cost_price": 0.35,
+    "cost_model": "measured_total_replaces_spread_commission",
+    "crt_watch_observations": {},
+    "crt_candidate_observations": [],
+    "vplr_enabled": true,
+    "vplr_session_override": true,
+    "vplr_scope": "ASIA_ONLY",
+    "vplr_session_window_utc": [
+      "00:00:00",
+      "06:30:00"
+    ],
+    "vp_poc_band_frac": 0.1,
+    "vp_profile_bars": 42,
+    "vp_target_bins": 60,
+    "ema_band_enabled": false,
+    "ema_band_mode": "TREND",
+    "stb_relax_continuation": false,
+    "ema_band_period": 18,
+    "ema_band_timeframe": "H1",
+    "warmup_lead_days": 45,
+    "commission_per_lot": 11.0,
+    "daily_loss_limit_usd": 100.0,
+    "cooldown_enabled": true,
+    "win_cooldown_minutes": 5.0,
+    "loss_cooldown_policy": "NEXT_UTC_HOUR",
+    "allow_whole_day": false,
+    "enabled_triggers": [
+      "VP_LIQUIDITY_REACTION"
+    ],
+    "enabled_sessions": [
+      "LONDON_NY",
+      "TOKYO_OPEN"
+    ],
+    "enforce_session_windows": true,
+    "enforce_news_blackout": true,
+    "fill_at_next_bar_open": true,
+    "incidents_path": null,
+    "incidents_written": 0
+  },
+  "summary": {
+    "trades": 1,
+    "wins": 0,
+    "losses": 1,
+    "win_rate_pct": 0.0,
+    "net_pnl": -13.36,
+    "gross_pnl": -12.31,
+    "total_costs": 1.05,
+    "ending_balance": 986.64,
+    "by_symbol": {
+      "XAUUSD": {
+        "trades": 1,
+        "pnl": -13.36
+      }
+    }
+  },
+  "rejections": {
+    "SESSION": 156,
+    "NO_TRIGGER": 66,
+    "VPLR_FUNNEL:raid without reclaim/MSS/confluence": 24,
+    "COOLDOWN": 12,
+    "SYMBOL_DEDUP": 11,
+    "RECLAIM_WAIT_LEVEL": 6,
+    "M15_FVG_CONSUMED": 1
+  },
+  "triggers_detected": {
+    "VP_LIQUIDITY_REACTION": 7
+  },
+  "leg_conf_labels": {},
+  "leg_conf_admitted": {},
+  "rejections_by_trigger": {
+    "RECLAIM_WAIT_LEVEL:VP_LIQUIDITY_REACTION": 6
+  },
+  "equity_curve": [
+    [
+      "2026-09-04T05:00:00+00:00",
+      986.64
+    ]
+  ],
+  "trades": [
+    {
+      "symbol": "XAUUSD",
+      "open_time": "2026-09-04T04:00:00+00:00",
+      "close_time": "2026-09-04T05:00:00+00:00",
+      "trigger_type": "VP_LIQUIDITY_REACTION",
+      "direction": "BEARISH",
+      "entry": 4466.891,
+      "signal_price": 4467.215,
+      "sl": 4477.562339285714,
+      "tp1": 4446.520321428572,
+      "tp2": 4436.172982142858,
+      "exit_price": 4470.993,
+      "result": "LOSS",
+      "exit_reason": "NO_PROGRESS",
+      "pnl": -13.36,
+      "gross_pnl": -12.31,
+      "cost_usd": 1.05,
+      "volume": 0.03,
+      "risk_usd": 31.04,
+      "r_multiple": -0.4304,
+      "duration_min": 60,
+      "session": "VP_ASIA",
+      "matched_triggers": "VP_LIQUIDITY_REACTION",
+      "tga_managed": true,
+      "tga_sl_stage": 0,
+      "tga_peak_r": 0.1722,
+      "tga_mae_r": -0.7624,
+      "tga_tp_extended": false,
+      "tga_legs": 1,
+      "stb_confidence": "MEDIUM",
+      "short_term_bias": "BEARISH",
+      "htf_trend": "BULLISH",
+      "recent_sweep": "",
+      "vp_level": "POC",
+      "vp_level_source": "EQUAL_HIGHS",
+      "vp_sweep_depth_atr": 0.307,
+      "vp_confluences": "RECLAIM+FVG+REJECTION_WICK+ATR_MOMENTUM",
+      "wick_ratio": -1.0,
+      "reclaim": {
+        "allow": true,
+        "reason": "RECLAIM_NO_BROKEN_LEVEL",
+        "active": false,
+        "level": null,
+        "zone_buffer": 0.0,
+        "broken_at": null,
+        "reclaimed_at": null,
+        "fvg_low": null,
+        "fvg_high": null,
+        "fvg_formed_at": null,
+        "retest_at": null,
+        "direction": ""
+      },
+      "m15_fvg": null,
+      "htf_crt": null
+    }
+  ],
+  "research": {
+    "optional_activation": true,
+    "unused_crt_watch_suppressed": true,
+    "note": "VP-only native ASIA_ONLY/00:00-06:30 allowance preserved; not the current production session sample"
+  }
+}

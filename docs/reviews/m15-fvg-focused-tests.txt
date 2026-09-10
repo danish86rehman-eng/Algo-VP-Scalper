@@ -1,0 +1,30 @@
+test_4300_is_a_conditional_plan_not_a_claimed_broker_fill (test_m15_fvg_entry.BrokerAndExecutionTests.test_4300_is_a_conditional_plan_not_a_claimed_broker_fill) ... ok
+test_final_cost_gate_blocks_a_new_wide_spread (test_m15_fvg_entry.BrokerAndExecutionTests.test_final_cost_gate_blocks_a_new_wide_spread) ... ok
+test_guardian_restores_structural_target_from_broker_comment (test_m15_fvg_entry.BrokerAndExecutionTests.test_guardian_restores_structural_target_from_broker_comment) ... D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\trade_guardian_agent.py:42: ResourceWarning: unclosed file <_io.TextIOWrapper name='D:\\Hermes Quant\\Quant GPT Test Claude - Final\\apex_ai\\logs\\tga_log.txt' mode='a' encoding='utf-8'>
+  logging.basicConfig(
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_invalid_final_quote_never_submits_an_order (test_m15_fvg_entry.BrokerAndExecutionTests.test_invalid_final_quote_never_submits_an_order) ... ok
+test_live_and_backtest_share_entry_evaluator (test_m15_fvg_entry.BrokerAndExecutionTests.test_live_and_backtest_share_entry_evaluator) ... ok
+test_simulated_guardian_keeps_structural_target (test_m15_fvg_entry.BrokerAndExecutionTests.test_simulated_guardian_keeps_structural_target) ... ok
+test_both_directions_enter_zone_and_target_before_structure (test_m15_fvg_entry.M15FVGTests.test_both_directions_enter_zone_and_target_before_structure) ... ok
+test_denied_m15_plan_cannot_fall_back_to_old_m5_fvg (test_m15_fvg_entry.M15FVGTests.test_denied_m15_plan_cannot_fall_back_to_old_m5_fvg) ... ok
+test_fully_mitigated_gap_is_consumed_even_by_a_wick (test_m15_fvg_entry.M15FVGTests.test_fully_mitigated_gap_is_consumed_even_by_a_wick) ... ok
+test_future_bars_do_not_change_entry (test_m15_fvg_entry.M15FVGTests.test_future_bars_do_not_change_entry) ... ok
+test_fvg_target_does_not_require_breakout_through_resistance (test_m15_fvg_entry.M15FVGTests.test_fvg_target_does_not_require_breakout_through_resistance) ... ok
+test_m15_plan_precedes_sweep_but_respects_trigger_whitelist (test_m15_fvg_entry.M15FVGTests.test_m15_plan_precedes_sweep_but_respects_trigger_whitelist) ... ok
+test_missing_bar_history_fails_closed (test_m15_fvg_entry.M15FVGTests.test_missing_bar_history_fails_closed) ... ok
+test_nearest_obstacle_cannot_be_skipped_to_improve_rr (test_m15_fvg_entry.M15FVGTests.test_nearest_obstacle_cannot_be_skipped_to_improve_rr) ... ok
+test_no_structural_target_no_trade (test_m15_fvg_entry.M15FVGTests.test_no_structural_target_no_trade) ... ok
+test_partial_visit_does_not_consume_gap (test_m15_fvg_entry.M15FVGTests.test_partial_visit_does_not_consume_gap) ... ok
+test_price_outside_zone_does_not_create_fvg_entry (test_m15_fvg_entry.M15FVGTests.test_price_outside_zone_does_not_create_fvg_entry) ... ok
+test_quote_guard_rejects_chasing_adverse_move_and_invalid_price (test_m15_fvg_entry.M15FVGTests.test_quote_guard_rejects_chasing_adverse_move_and_invalid_price) ... ok
+test_same_zone_needs_departure_after_prior_close (test_m15_fvg_entry.M15FVGTests.test_same_zone_needs_departure_after_prior_close) ... ok
+test_target_under_2r_is_rejected_without_tightening_stop (test_m15_fvg_entry.M15FVGTests.test_target_under_2r_is_rejected_without_tightening_stop) ... ok
+test_third_candle_must_have_closed (test_m15_fvg_entry.M15FVGTests.test_third_candle_must_have_closed) ... ok
+test_weak_displacement_does_not_create_zone (test_m15_fvg_entry.M15FVGTests.test_weak_displacement_does_not_create_zone) ... ok
+
+----------------------------------------------------------------------
+Ran 22 tests in 0.403s
+
+OK

@@ -66,6 +66,7 @@ EOD_HOUR_UTC = 23
 #: Per-trigger regime whitelist. Fading liquidity grabs is the MANIPULATION
 #: play, so SWEEP_REJECTION/JUDAS are whitelisted there rather than blocked.
 TRIGGER_REGIME_WHITELIST: Dict[str, FrozenSet[str]] = {
+    "HTF_CRT_SWEEP": frozenset({"MANIPULATION", "ROTATION", "EXPANSION"}),
     "SWEEP_REJECTION": frozenset({"MANIPULATION", "ROTATION"}),
     "JUDAS":           frozenset({"MANIPULATION", "ROTATION"}),
     "BOS_RETEST":      frozenset({"EXPANSION"}),
@@ -91,6 +92,11 @@ THIN_LIQ_REQUIRED_CONFIDENCE = "HIGH"
 MAX_OPEN_POSITIONS = 2
 
 CONSULT_MAX_LATENCY_MS = 200.0
+
+
+def entry_confidence_allowed(trigger_confidence, stb_confidence):
+    """Pre-2026-09-07 policy: STB admission is the confidence decision."""
+    return True
 
 # ── News blackout ────────────────────────────────────────────────────────────
 NEWS_BLACKOUT_BEFORE_MIN = 30
@@ -180,12 +186,12 @@ STB_RANGE_GUARD_TRIGGERS = frozenset({"SWEEP_REJECTION", "JUDAS", "FVG_FILL"})
 #: Layer 3, NEUTRAL branch — triggers allowed through with no clear short-term
 #: read. A setup that does not need a directional bias to be valid.
 STB_NEUTRAL_OK_TRIGGERS = frozenset({"SWEEP_REJECTION", "JUDAS", "FVG_FILL",
-                                     "VP_LIQUIDITY_REACTION"})
+                                     "VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP"})
 
 #: Layer 3, OPPOSING branch — triggers that are MEANT to trade against the
 #: prevailing short-term read. This is the set L-009 named as the blocker.
 STB_COUNTER_TREND_TRIGGERS = frozenset({"SWEEP_REJECTION",
-                                        "VP_LIQUIDITY_REACTION"})
+                                        "VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP"})
 
 
 # ── H4 volume profile / value-area location gate ─────────────────────────────
@@ -557,6 +563,30 @@ LEG_CONF_MODE = "LVN_VETO"
 LEG_CONF_ENABLED = False
 
 
+# ── Sweep-candle wick qualification (L-016) ──────────────────────────────────
+# `_check_sweep_rejection` admits a setup on two conditions only: any extreme in
+# the last 4 bars pierced the level, and the LAST bar closes back through it.
+# Nothing requires the piercing candle to have REJECTED anything, so a shallow
+# two-pip tag is admitted on identical terms to a violent rejection wick.
+#
+# The remedy requires the sweeping candle's wick beyond the level to be at least
+# this fraction of that candle's total range:
+#
+#     (high - max(open,close)) / range   for a BSL (buy-side) sweep
+#     (min(open,close) - low)  / range   for an SSL (sell-side) sweep
+#
+#: Grade C — design only (§13.7). MQL5 art. 22140 ships a detector around
+#: MIN_WICK_RATIO = 45 and publishes no win rate, profit factor, trade count or
+#: date range. 45 is a starting value, not a validated one, which is why L-016
+#: sweeps 0.35 / 0.45 / 0.55 rather than adopting it.
+SWEEP_WICK_RATIO_MIN = 0.45
+
+#: Master switch. Default OFF — with this False the ratio is still COMPUTED and
+#: stamped on the trigger for attribution, but nothing branches on it, so the
+#: baseline trade list is reproduced exactly. Ledger L-016, PROPOSED.
+SWEEP_WICK_FILTER_ENABLED = False
+
+
 # ── Configuration era ────────────────────────────────────────────────────────
 #: Stamped onto every incident row so aggregates cannot silently pool trades
 #: taken under different gate configurations. Bump this whenever a gate flag
@@ -565,4 +595,37 @@ LEG_CONF_ENABLED = False
 #: Why it exists: `logs/sa_incidents.jsonl` currently holds 204 `Whole_day`
 #: rows from 2026-05-06..05-15, taken before 13.6 closed that window. Every
 #: naive query over that file pools them with current-config trades.
-CONFIG_ERA = "2026-08-28-s1"
+CONFIG_ERA = "2026-09-09-pre-high-confidence-restored"
+
+# L-019 operator-requested demo trigger. 'MN1' means monthly, never M1.
+CRT_ENABLED = True
+CRT_TIMEFRAMES = {"MN1": mt5.TIMEFRAME_MN1, "W1": mt5.TIMEFRAME_W1,
+                  "D1": mt5.TIMEFRAME_D1}
+CRT_RANGE_BARS = 10
+CRT_LEVEL_ATR = 0.10
+CRT_STOP_ATR = 0.30
+CRT_MAX_ENTRY_BARS = 24
+CRT_MIN_R = 2.0
+CRT_ORDER_PREFIX = "SA_CRT_"
+CRT_CONFLUENCE_MODE = "OBSERVE"
+CRT_CONFLUENCE_MODES = ("OBSERVE", "MSS", "MSS_RETEST")
+
+# L-017: operator-requested entry contract. Initial mechanical definitions,
+# not optimized thresholds or a claim of positive trading expectancy.
+RECLAIM_FVG_ENABLED = True
+RECLAIM_SWING_BARS = 3
+RECLAIM_ATR_PERIOD = 14
+RECLAIM_ZONE_ATR = 0.10
+RECLAIM_BODY_ATR = 0.80
+RECLAIM_BODY_FRACTION = 0.60
+RECLAIM_CLOSE_LOCATION = 0.75
+RECLAIM_MIN_FVG_ATR = 0.05
+RECLAIM_MAX_FVG_BARS = 24
+
+# L-018: enter a confirmed M15 FVG, targeting before broken structure.
+# Reuses displacement/age definitions above and the existing FVG 0.3 ATR stop
+# buffer. The 2R and cost floors stay binding; never tighten a stop to fit TP.
+M15_FVG_ENTRY_ENABLED = True
+M15_FVG_STOP_ATR = 0.30
+M15_FVG_MIN_R = 2.0
+M15_FVG_ORDER_COMMENT = "SA_FVG_M15"

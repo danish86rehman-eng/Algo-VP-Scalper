@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from scalper.session_checker import SASessionChecker
+from scalper.session_checker import DEFAULT_ENABLED_SESSIONS, SASessionChecker
 from scalper.trigger_engine import SATriggerEngine
 
 
@@ -73,9 +73,29 @@ class TestTriggerWhitelist(unittest.TestCase):
 
 
 class TestSessionWhitelist(unittest.TestCase):
-    def test_default_enables_every_window(self):
+    def test_default_enables_only_selected_windows(self):
         sc = SASessionChecker()
-        self.assertEqual(sc.enabled_sessions, set(SASessionChecker.ALL_WINDOWS))
+        self.assertEqual(sc.enabled_sessions, set(DEFAULT_ENABLED_SESSIONS))
+
+    def test_operator_default_window_schedule(self):
+        # Operator enabled all five named windows on 2026-09-08.
+        for hour, minute, expected in (
+                (0, 0, "TOKYO_OPEN"), (2, 0, "IDLE"),
+                (6, 30, "PRE_LONDON"), (7, 0, "LONDON_OPEN"),
+                (8, 30, "IDLE"), (12, 0, "LONDON_NY"),
+                (13, 30, "IDLE"), (16, 30, "NY_LUNCH_REV"),
+                (17, 30, "IDLE")):
+            with self.subTest(hour=hour, minute=minute):
+                moment = datetime(2026, 6, 1, hour, minute,
+                                  tzinfo=timezone.utc)
+                self.assertEqual(
+                    SASessionChecker().get_state(moment).window_name, expected)
+
+    def test_excluded_window_can_be_enabled_explicitly(self):
+        moment = datetime(2026, 6, 1, 7, 15, tzinfo=timezone.utc)
+        state = SASessionChecker(enabled_sessions=["LONDON_OPEN"]).get_state(moment)
+        self.assertTrue(state.in_window)
+        self.assertEqual(state.window_name, "LONDON_OPEN")
 
     def test_unknown_session_raises(self):
         with self.assertRaises(ValueError):
@@ -88,8 +108,9 @@ class TestSessionWhitelist(unittest.TestCase):
     def test_disabled_window_is_idle(self):
         """07:15 UTC is inside LONDON_OPEN; with London off it must be IDLE."""
         moment = datetime(2026, 6, 1, 7, 15, tzinfo=timezone.utc)
-        self.assertEqual(
-            SASessionChecker().get_state(moment).window_name, "LONDON_OPEN")
+        self.assertEqual(SASessionChecker(
+            enabled_sessions=["LONDON_OPEN"]).get_state(moment).window_name,
+            "LONDON_OPEN")
         off = SASessionChecker(enabled_sessions=["TOKYO_OPEN"])
         state = off.get_state(moment)
         self.assertFalse(state.in_window)

@@ -1,0 +1,122 @@
+{
+  "_comment": "CANONICAL XAUUSD EXECUTION-COST MODEL. Backtests MUST consume this instead of scenario constants (CLAUDE.md §6 procedural rule 10). All values in PRICE UNITS = USD per troy ounce, directly comparable to a backtest's stop distance. Regenerate with scratchpad/cost_model.py against a verified account.",
+  "provenance": {
+    "measured_utc": "2026-09-01",
+    "account_login": 40280210,
+    "server": "Exness-MT5Trial2",
+    "company": "Exness Technologies Ltd",
+    "trade_mode": 0,
+    "trade_mode_name": "DEMO",
+    "server_utc_offset_hours": 0,
+    "symbol": "XAUUSD",
+    "contract_size": 100.0,
+    "point": 0.001,
+    "digits": 3,
+    "deal_history_span": "2025-05-01 .. 2026-09-01",
+    "xauusd_deals": 1913,
+    "deals_with_matched_order": 650,
+    "spread_reconstructed_deals": 1414,
+    "tick_sample_days": 45,
+    "tick_sample_span": "2026-07-01 .. 2026-09-01",
+    "tick_sample_size": 1800000,
+    "WARNING": "DEMO ACCOUNT. Demo fill quality is not live fill quality. Spread may be tighter and slippage more benign than a funded account. Treat as an upper bound on execution quality; re-measure before any live promotion."
+  },
+
+  "spread": {
+    "_unit": "USD/oz, full bid-ask",
+    "at_deal_timestamps": { "n": 1414, "median": 0.060, "p75": 0.074, "p90": 0.115, "p95": 0.115, "max": 0.247 },
+    "general_tick_distribution": { "n": 1800000, "median": 0.040, "p75": 0.050, "p90": 0.050, "p95": 0.050, "p99": 0.050, "max": 0.270 },
+    "by_session_at_deals": {
+      "asia":       { "n": 470, "median": 0.050, "p75": 0.071, "p90": 0.115, "p95": 0.115, "max": 0.192 },
+      "london":     { "n": 421, "median": 0.057, "p75": 0.071, "p90": 0.115, "p95": 0.115, "max": 0.247 },
+      "ny_overlap": { "n": 405, "median": 0.071, "p75": 0.097, "p90": 0.115, "p95": 0.115, "max": 0.217 },
+      "ny_pm":      { "n": 118, "median": 0.071, "p75": 0.071, "p90": 0.102, "p95": 0.115, "max": 0.247 }
+    },
+    "by_volatility_regime": {
+      "_definition": "terciles of daily median spread",
+      "low":  { "days": 43, "n": 594, "median": 0.040, "p90": 0.050, "p95": 0.050, "max": 0.160 },
+      "mid":  { "days": 23, "n": 491, "median": 0.071, "p90": 0.115, "p95": 0.115, "max": 0.247 },
+      "high": { "days": 19, "n": 303, "median": 0.097, "p90": 0.115, "p95": 0.118, "max": 0.247 }
+    },
+    "hourly_note": "Flat across all 24 UTC hours: median 0.040-0.050, p95 0.050 everywhere. Only hour 22 UTC differs (median 0.050, p95 0.090). Session effects appear in the at-deal sample, not the raw tick sample."
+  },
+
+  "commission": {
+    "_unit": "USD/oz",
+    "per_ounce": 0.110,
+    "charged_on": "entry deal only",
+    "n": 872,
+    "variance": "none observed - constant 0.110 across all 872 entry deals",
+    "total_usd_observed": -3910.17
+  },
+
+  "fees": { "per_ounce": 0.0, "n_nonzero": 0, "note": "No fee field populated on any of 1913 deals." },
+
+  "swap": {
+    "_unit": "USD/oz per night",
+    "observed_charged": 0.0,
+    "deals_with_swap": 0,
+    "of_deals": 1913,
+    "quoted_swap_long_points": -515.5,
+    "quoted_swap_short_points": 0.0,
+    "swap_mode": 1,
+    "quoted_swap_long_usd_per_oz_per_night": -0.5155,
+    "note": "Zero swap charged because the traded system is intraday and holds nothing overnight. Material for any swing/multi-day rule: longs pay ~0.52 USD/oz/night, shorts pay nothing. Do NOT ignore for overnight strategies."
+  },
+
+  "slippage": {
+    "_unit": "USD/oz, positive = adverse",
+    "_definition": "deal.price vs order.price_open, sign-corrected so positive is against the trade",
+    "market_orders_all": { "n": 650, "median": 0.0, "mean": 0.0537, "p75": 0.0, "p90": 0.214, "p95": 0.485, "max": 3.687 },
+    "by_order_type": {
+      "BUY":        { "n": 281, "nonzero_pct": 35.2, "median": 0.0,   "mean": 0.0536, "p90": 0.213, "p95": 0.469, "max": 3.687 },
+      "SELL":       { "n": 292, "nonzero_pct": 51.0, "median": 0.0,   "mean": 0.0537, "p90": 0.303, "p95": 0.624, "max": 2.051 },
+      "BUY_LIMIT":  { "n": 22,  "nonzero_pct": 4.5,  "median": 0.0,   "mean": -0.0341, "p90": 0.0,  "p95": 0.0,   "max": 0.0 },
+      "SELL_LIMIT": { "n": 35,  "nonzero_pct": 5.7,  "median": 0.0,   "mean": -0.0277, "p90": 0.0,  "p95": 0.0,   "max": 0.0 },
+      "BUY_STOP":   { "n": 14,  "nonzero_pct": 21.4, "median": 0.0,   "mean": 0.0744, "p90": 0.185, "p95": 0.365, "max": 0.683 },
+      "SELL_STOP":  { "n": 6,   "nonzero_pct": 50.0, "median": 0.065, "mean": 0.1502, "p90": 0.386, "p95": 0.427, "max": 0.469 }
+    },
+    "stop_loss_triggered_exits": {
+      "n": 154, "median": 0.0, "mean": 0.1629, "p90": 0.621, "p95": 0.800, "max": 1.574,
+      "note": "SL exits slip ~3x worse at the tail than the general population. This is the single most decision-relevant slippage figure for any stop-based rule."
+    },
+    "by_session": {
+      "asia":       { "n": 121, "median": 0.0, "p90": 0.107, "p95": 0.469, "max": 1.352 },
+      "london":     { "n": 166, "median": 0.0, "p90": 0.291, "p95": 0.618, "max": 1.574 },
+      "ny_overlap": { "n": 235, "median": 0.0, "p90": 0.175, "p95": 0.438, "max": 3.687 },
+      "ny_pm":      { "n": 105, "median": 0.0, "p90": 0.221, "p95": 0.334, "max": 1.283 },
+      "late":       { "n": 23,  "median": 0.0, "p90": 0.743, "p95": 0.877, "max": 0.944, "UNDERPOWERED": true }
+    },
+    "by_direction": {
+      "buy":  { "n": 317, "median": 0.0, "p90": 0.200, "p95": 0.467, "max": 3.687 },
+      "sell": { "n": 333, "median": 0.0, "p90": 0.283, "p95": 0.606, "max": 2.051 }
+    },
+    "limit_orders_note": "Limit fills show slightly NEGATIVE mean slippage (price improvement) and essentially no adverse tail. Entry style materially changes cost."
+  },
+
+  "round_trip_model": {
+    "_unit": "USD/oz",
+    "_how_to_use": "Do NOT add percentiles across components - they do not co-occur. Use RECOMMENDED_DEFAULT for a single-number backtest, or sample components independently from their distributions for a Monte Carlo cost overlay.",
+    "components_mean": {
+      "spread_crossing": 0.060,
+      "commission": 0.110,
+      "entry_slippage": 0.054,
+      "exit_slippage_blended": 0.126,
+      "_exit_blend_note": "402 SL-reason vs 117 TP-reason exits; TP/limit exits ~0 adverse, SL exits mean 0.163"
+    },
+    "RECOMMENDED_DEFAULT_mean": 0.35,
+    "median_case": 0.17,
+    "stress_p90": 0.75,
+    "worst_observed": 4.05,
+    "conversion": "cost_in_R = round_trip_cost / trade_stop_distance_in_price_units"
+  },
+
+  "supersedes": {
+    "scenario_constants_used_before_2026_09_01": {
+      "spread": 0.50,
+      "stop_slippage": 0.30,
+      "total": 0.80,
+      "verdict": "TOO PESSIMISTIC BY ~2.3x AT THE MEAN. Sits near the p90-p95 of measured cost, not a base case. Conclusions that depended on it must be re-checked - see xauusd-execution-costs.md."
+    }
+  }
+}

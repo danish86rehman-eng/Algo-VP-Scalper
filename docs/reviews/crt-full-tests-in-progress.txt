@@ -1,0 +1,229 @@
+2026-09-03 04:56:01,629Z [SA.CRG] WARNING: SA-CRG: 2 consecutive losses — pause until 09:15 UTC
+2026-09-03 04:56:01,629Z [SA.CRG] INFO: SA-CRG BLOCK: Loss pause active, 15m remaining
+2026-09-03 04:56:01,629Z [SA.CRG] INFO: SA-CRG BLOCK: Loss pause active, 5m remaining
+2026-09-03 04:56:01,629Z [SA.CRG] INFO: SA-CRG: All checks passed — trade APPROVED
+2026-09-03 04:56:01,629Z [SA] INFO: SA close confirmed: ticket=1 XAUUSD reason=TIMEOUT
+2026-09-03 04:56:01,630Z [SA] ERROR: SA close UNCONFIRMED ticket=1 XAUUSD reason=TIMEOUT: order accepted but position still open (partial fill?) — stays tracked, retrying next cycle
+2026-09-03 04:56:01,630Z [SA] ERROR: SA close FAILED ticket=1: no tick for XAUUSD — position left open and still tracked
+2026-09-03 04:56:01,630Z [SA] INFO: SA close confirmed: ticket=1 XAUUSD reason=TIMEOUT
+2026-09-03 04:56:01,631Z [SA] INFO: SA close confirmed: ticket=1 XAUUSD reason=EOD_CLOSE
+2026-09-03 04:56:01,631Z [SA] INFO: SA close confirmed: ticket=1 XAUUSD reason=EOD_RESET
+2026-09-03 04:56:01,631Z [SA] ERROR: SA close FAILED ticket=1 XAUUSD reason=EOD_CLOSE retcode=10018 comment=fake — position remains open and stays tracked
+2026-09-03 04:56:01,634Z [SA.Pool] INFO: SA Capital Pool initialized: $1000.00 | Max daily loss: $20.00
+2026-09-03 04:56:01,634Z [SA.Reset] INFO: SA Daily Reset: Starting end-of-day protocol
+2026-09-03 04:56:01,635Z [SA.Reset] ERROR: SA Reset: FAILED to close 1 — it remains open at the broker and must stay tracked
+2026-09-03 04:56:01,635Z [SA.Reset] INFO: SA Daily P&L: $+0.00 (FLAT)
+2026-09-03 04:56:01,651Z [SA.Pool] INFO: SA daily reset. New pool: $1000.00
+2026-09-03 04:56:01,652Z [SA.Pool] INFO: SA Capital Pool initialized: $1000.00 | Max daily loss: $20.00
+2026-09-03 04:56:01,653Z [SA.Reset] INFO: SA Daily Reset: Starting end-of-day protocol
+2026-09-03 04:56:01,653Z [SA.Reset] INFO: SA Reset: Closed ticket 1
+2026-09-03 04:56:01,654Z [SA.Reset] INFO: SA Daily P&L: $+0.00 (FLAT)
+2026-09-03 04:56:01,671Z [SA.Pool] INFO: SA daily reset. New pool: $1000.00
+2026-09-03 04:56:01,672Z [SA] INFO: SA close confirmed: ticket=1 XAUUSD reason=EOD_CLOSE
+2026-09-03 04:56:01,673Z [SA] INFO: SA EOD_CLOSE: Ticket 1 closed at market
+2026-09-03 04:56:01,673Z [SA] ERROR: SA close FAILED ticket=1 XAUUSD reason=EOD_CLOSE retcode=10018 comment=fake — position remains open and stays tracked
+2026-09-03 04:56:01,673Z [SA] ERROR: SA EOD_CLOSE: ticket 1 could NOT be closed and remains open. It stays tracked; the next cycle retries.
+2026-09-03 04:56:01,674Z [SA.Pool] INFO: SA Capital Pool initialized: $1000.00 | Max daily loss: $20.00
+2026-09-03 04:56:01,674Z [SA.Pool] INFO: SA Capital Pool restored: daily_pnl=$-20.00 | pool=$1000.00 | trades_today=0 | consecutive_losses=0
+2026-09-03 04:56:01,674Z [SA.Pool] INFO: SA Capital Pool initialized: $1000.00 | Max daily loss: $20.00
+2026-09-03 04:56:01,674Z [SA.Pool] INFO: SA Capital Pool restored: daily_pnl=$-20.00 | pool=$423.77 | trades_today=0 | consecutive_losses=0
+2026-09-03 04:56:01,677Z [SA.Logger] INFO: 
+[SA TRADE LOG]
+Instrument     : XAUUSD
+Session Window : LONDON_OPEN
+Trigger Type   : SWEEP_REJECTION
+Entry Price    : 4638.00000
+Stop Loss      : 4647.00000
+TP1 Target     : 4620.00000
+TP2 Target     : 4612.00000
+Position Size  : 0.01 lots (SA pool only)
+SA Pool Risk % : 3.00%
+Main Acct Risk : 0% (isolated)
+Trade Duration : 0m
+Result         : OPEN
+SA Pool P&L    : $+0.00
+SA State After : ACTIVE
+
+2026-09-03 04:56:01,692Z [SA.Logger] INFO: SA Trade CLOSED | Ticket=1 | Result=LOSS | PnL=$+0.00 | Duration=0m | State->ACTIVE
+2026-09-03 04:56:01,712Z [SA.Logger] INFO: SA Trade CORRECTED | Ticket=1 | was LOSS $+0.00 -> now WIN_TP1 $+8.17
+2026-09-03 04:56:01,731Z [SA.Logger] INFO: 
+[SA TRADE LOG]
+Instrument     : XAUUSD
+Session Window : LONDON_OPEN
+Trigger Type   : SWEEP_REJECTION
+Entry Price    : 4638.00000
+Stop Loss      : 4647.00000
+TP1 Target     : 4620.00000
+TP2 Target     : 4612.00000
+Position Size  : 0.01 lots (SA pool only)
+SA Pool Risk % : 3.00%
+Main Acct Risk : 0% (isolated)
+Trade Duration : 0m
+Result         : OPEN
+SA Pool P&L    : $+0.00
+SA State After : ACTIVE
+
+2026-09-03 04:56:01,748Z [SA.Logger] INFO: SA Trade CLOSED | Ticket=1 | Result=WIN_TP1 | PnL=$+8.17 | Duration=0m | State->ACTIVE
+2026-09-03 04:56:01,767Z [SA.Logger] WARNING: SA Logger: no open record for ticket 9876 — writing a close-only row (adopted position?)
+2026-09-03 04:56:01,768Z [SA.Logger] INFO: SA Trade CLOSED | Ticket=9876 | Result=WIN_TP1 | PnL=$+12.50 | Duration=0m | State->ACTIVE
+2026-09-03 04:56:01,785Z [SA.Logger] INFO: 
+[SA TRADE LOG]
+Instrument     : XAUUSD
+Session Window : LONDON_OPEN
+Trigger Type   : SWEEP_REJECTION
+Entry Price    : 4638.00000
+Stop Loss      : 4647.00000
+TP1 Target     : 4620.00000
+TP2 Target     : 4612.00000
+Position Size  : 0.01 lots (SA pool only)
+SA Pool Risk % : 3.00%
+Main Acct Risk : 0% (isolated)
+Trade Duration : 0m
+Result         : OPEN
+SA Pool P&L    : $+0.00
+SA State After : ACTIVE
+
+2026-09-03 04:56:01,800Z [SA.Logger] INFO: 
+[SA TRADE LOG]
+Instrument     : XAUUSD
+Session Window : LONDON_OPEN
+Trigger Type   : SWEEP_REJECTION
+Entry Price    : 4638.00000
+Stop Loss      : 4647.00000
+TP1 Target     : 4620.00000
+TP2 Target     : 4612.00000
+Position Size  : 0.01 lots (SA pool only)
+SA Pool Risk % : 3.00%
+Main Acct Risk : 0% (isolated)
+Trade Duration : 0m
+Result         : OPEN
+SA Pool P&L    : $+0.00
+SA State After : ACTIVE
+
+2026-09-03 04:56:01,819Z [SA.Logger] INFO: SA Trade CLOSED | Ticket=1 | Result=LOSS | PnL=$-4.00 | Duration=0m | State->ACTIVE
+2026-09-03 04:56:01,837Z [SA.Logger] INFO: SA Trade CLOSED | Ticket=2 | Result=LOSS | PnL=$-3.00 | Duration=0m | State->ACTIVE
+2026-09-03 04:56:01,853Z [SA.Logger] INFO: SA Trade CORRECTED | Ticket=1 | was LOSS $-4.00 -> now WIN_TP1 $+9.00
+2026-09-03 04:56:01,869Z [SA] WARNING: SA: ticket 1 is gone but its closing deal has not settled (0.0m of 10m grace) — not booked; retrying next cycle.
+2026-09-03 04:56:01,869Z [SA] ERROR: SA: ticket 1 closed with no closing deal in history after 0.0m — booking UNRECONCILED at $0.00 to release the position slot. The pool balance is now understated by this trade's true P&L; reconcile with get_agent_pnl.py.
+2026-09-03 04:56:01,869Z [SA] WARNING: SA: ticket 1 is gone but its closing deal has not settled (0.0m of 10m grace) — not booked; retrying next cycle.
+2026-09-03 04:56:01,869Z [SA] WARNING: SA: ticket 1 is gone but its closing deal has not settled (0.0m of 10m grace) — not booked; retrying next cycle.
+2026-09-03 04:56:01,869Z [SA] ERROR: SA: ticket 1 closed with no closing deal in history after 12667.0m — booking UNRECONCILED at $0.00 to release the position slot. The pool balance is now understated by this trade's true P&L; reconcile with get_agent_pnl.py.
+2026-09-03 04:56:01,870Z [SA] WARNING: SA: ticket 1 is gone but its closing deal has not settled (0.0m of 10m grace) — not booked; retrying next cycle.
+2026-09-03 04:56:01,870Z [SA] WARNING: SA: ticket 1 is gone but its closing deal has not settled (0.0m of 10m grace) — not booked; retrying next cycle.
+2026-09-03 04:56:01,870Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $+0.00 -> hold until 12:00 UTC (1800s)
+2026-09-03 04:56:01,870Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-2.00 -> hold until 12:00 UTC (2700s)
+2026-09-03 04:56:01,870Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-12.50 -> hold until 12:00 UTC (2700s)
+2026-09-03 04:56:01,870Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-3.00 -> hold until 12:00 UTC (300s)
+2026-09-03 04:56:01,870Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-1.00 -> hold until 12:00 UTC (3600s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-5.00 -> hold until 00:00 UTC (1200s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-10.00 -> hold until 12:00 UTC (2700s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-1.00 -> hold until 12:00 UTC (2700s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-10.00 -> hold until 12:00 UTC (2700s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] WARNING: SA Cooldown restored from history: holds until 12:00 UTC (480s left)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: LOSS $-1.00 -> hold until 12:00 UTC (1800s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: WIN $+8.00 -> 5m break (300s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: WIN $+1.00 -> 12m break (720s)
+2026-09-03 04:56:01,871Z [SA.Cooldown] INFO: SA Cooldown armed: WIN $+4.00 -> 5m break (300s)
+2026-09-03 04:56:06,290Z [SA.Postmortem] WARNING: skipping malformed incident line
+2026-09-03 04:56:06,309Z [SA.Postmortem] WARNING: postmortem failed for ticket 1: could not convert string to float: 'not-a-number'
+2026-09-03 04:56:06,544Z [SA] WARNING: SA XAUUSD: RECLAIM_QUOTE_MOVED — skip entry at 104.0
+2026-09-03 04:56:07,228Z [SA.Rejects] WARNING: unreadable rejection log at C:\Users\NAUMAN~1.ORI\AppData\Local\Temp\tmpfl_3lvul\rej.json — starting fresh
+2026-09-03 04:56:07,984Z [SA.State] INFO: SA State: IDLE -> PROTECTED | Main account DD 9.0% > 3% threshold
+2026-09-03 04:56:07,985Z [SA.State] INFO: SA State: IDLE -> HALTED | Daily loss limit hit (2% of SA pool)
+2026-09-03 04:56:07,985Z [SA.State] INFO: SA State: IDLE -> PAUSED | 2 consecutive losses — 15-min pause active
+2026-09-03 04:56:07,985Z [SA.State] INFO: SA State: IDLE -> ACTIVE | Session active, all checks clear
+2026-09-03 04:56:07,986Z [SA.State] INFO: SA State: IDLE -> VP_ONLY | Outside SA session window; VP-only allowance open
+..............................................................................................................................................................F.......................................................................................................................................................................................................................................................................F.F.F.........................F..............
+======================================================================
+FAIL: test_disabled_trigger_leaves_the_legacy_trigger_set_untouched (test_live_sim_parity.TestSharedConstants.test_disabled_trigger_leaves_the_legacy_trigger_set_untouched)
+The baseline-reproduction guarantee, asserted rather than inspected:
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\tests\test_live_sim_parity.py", line 161, in test_disabled_trigger_leaves_the_legacy_trigger_set_untouched
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        set(resolve_enabled_triggers(None, False)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        {"SWEEP_REJECTION", "FVG_FILL", "BOS_RETEST", "JUDAS",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+         "VALUE_AREA_FADE"})
+         ^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the first set but not the second:
+'HTF_CRT_SWEEP'
+
+======================================================================
+FAIL: test_pre_existing_relative_order_is_unchanged (test_vp_liquidity_trigger.PriorityTests.test_pre_existing_relative_order_is_unchanged)
+Everything below the new head must keep its position, or a disabled VP
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\tests\test_vp_liquidity_trigger.py", line 488, in test_pre_existing_relative_order_is_unchanged
+    self.assertEqual(SATriggerEngine.ALL_TRIGGERS[1:],
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     ("SWEEP_REJECTION", "FVG_FILL", "BOS_RETEST",
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      "JUDAS", "VALUE_AREA_FADE"))
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Tuples differ: ('VP_LIQUIDITY_REACTION', 'SWEEP_REJECTION'[50 chars]ADE') != ('SWEEP_REJECTION', 'FVG_FILL', 'BOS_RETEST[25 chars]ADE')
+
+First differing element 0:
+'VP_LIQUIDITY_REACTION'
+'SWEEP_REJECTION'
+
+First tuple contains 1 additional elements.
+First extra element 5:
+'VALUE_AREA_FADE'
+
++ ('SWEEP_REJECTION', 'FVG_FILL', 'BOS_RETEST', 'JUDAS', 'VALUE_AREA_FADE')
+- ('VP_LIQUIDITY_REACTION',
+-  'SWEEP_REJECTION',
+-  'FVG_FILL',
+-  'BOS_RETEST',
+-  'JUDAS',
+-  'VALUE_AREA_FADE')
+
+======================================================================
+FAIL: test_vp_is_first_in_all_triggers (test_vp_liquidity_trigger.PriorityTests.test_vp_is_first_in_all_triggers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\tests\test_vp_liquidity_trigger.py", line 479, in test_vp_is_first_in_all_triggers
+    self.assertEqual(SATriggerEngine.ALL_TRIGGERS[0],
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     "VP_LIQUIDITY_REACTION")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'HTF_CRT_SWEEP' != 'VP_LIQUIDITY_REACTION'
+- HTF_CRT_SWEEP
++ VP_LIQUIDITY_REACTION
+
+
+======================================================================
+FAIL: test_existing_membership_is_unchanged (test_vp_liquidity_trigger.STBMembershipTests.test_existing_membership_is_unchanged)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\tests\test_vp_liquidity_trigger.py", line 659, in test_existing_membership_is_unchanged
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        DP.STB_NEUTRAL_OK_TRIGGERS - {"VP_LIQUIDITY_REACTION"},
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        frozenset({"SWEEP_REJECTION", "JUDAS", "FVG_FILL"}))
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the first set but not the second:
+'HTF_CRT_SWEEP'
+
+======================================================================
+FAIL: test_disabled_default_set_equals_the_legacy_five (test_vp_liquidity_trigger.TriggerSetTests.test_disabled_default_set_equals_the_legacy_five)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Hermes Quant\Quant GPT Test Claude - Final\apex_ai\tests\test_vp_liquidity_trigger.py", line 553, in test_disabled_default_set_equals_the_legacy_five
+    self.assertEqual(set(resolve_enabled_triggers(None, False)),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     {"SWEEP_REJECTION", "FVG_FILL", "BOS_RETEST",
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      "JUDAS", "VALUE_AREA_FADE"})
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the first set but not the second:
+'HTF_CRT_SWEEP'
+
+----------------------------------------------------------------------
+Ran 467 tests in 6.393s
+
+FAILED (failures=5)

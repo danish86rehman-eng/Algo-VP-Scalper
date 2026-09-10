@@ -34,6 +34,7 @@ import time
 import json
 import logging
 import argparse
+from dataclasses import replace
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -126,6 +127,10 @@ from scalper.daily_reset     import SADailyReset
 from scalper.sa_consultant   import SAConsultant  # ReadOnly-Consultation layer
 from scalper.short_term_bias import ShortTermBiasFilter  # Task 6: short-term bias gate
 from scalper.cooldown        import SACooldown
+from scalper.reclaim_fvg     import (evaluate_reclaim, entry_in_reclaim_zone,
+                                     close_barriers)
+from scalper.m15_fvg_entry   import find_fvg_entry, entry_quote_allowed
+from scalper.htf_crt         import watch_crt, select_crt, used_setups, crt_quote_allowed
 from scalper.ema_filter      import EMABandFilter  # H1 EMA(18) high/low band
 from scalper.leg_confluence  import (MODES as LEG_CONF_MODES, build_leg_pair,
                                      evaluate as leg_conf_evaluate)
@@ -137,6 +142,7 @@ from scalper.pdr_gate       import (
     MODES as PDR_MODES, PDRGate)              # previous-day-range location
 from scalper.reject_log      import RejectionLog   # structured gate telemetry
 from scalper import postmortem as PMORTEM          # closed-trade forensics
+from scalper import execution_telemetry as EXEC_TEL  # immutable broker evidence
 from core.news_guard         import NewsGuard
 from core.news_fetcher       import fetch_and_save as fetch_news_events
 from core.constants          import (MAGIC_SCALPER, LOG_MAX_BYTES,
@@ -274,6 +280,12 @@ class ScalperAgent:
                  stb_relax_continuation: bool = DP.STB_RELAX_CONTINUATION,
                  leg_conf_enabled: bool = DP.LEG_CONF_ENABLED,
                  leg_conf_mode: str = DP.LEG_CONF_MODE,
+                 sweep_wick_filter: bool = DP.SWEEP_WICK_FILTER_ENABLED,
+                 sweep_wick_ratio: float = DP.SWEEP_WICK_RATIO_MIN,
+                 reclaim_fvg_enabled: bool = DP.RECLAIM_FVG_ENABLED,
+                 m15_fvg_entry_enabled: bool = DP.M15_FVG_ENTRY_ENABLED,
+                 htf_crt_enabled: bool = DP.CRT_ENABLED,
+                 crt_confluence_mode: str = DP.CRT_CONFLUENCE_MODE,
                  vp_gate_enabled: bool = DP.VP_GATE_ENABLED,
                  vp_gate_mode: str = DP.VP_GATE_MODE,
                  vp_poc_band_frac: float = DP.VP_POC_BAND_FRAC,
@@ -288,6 +300,16 @@ class ScalperAgent:
         self.symbols    = symbols
         self.interval   = interval
         self.dry_run    = dry_run
+        self.reclaim_fvg_enabled = reclaim_fvg_enabled
+        self.m15_fvg_entry_enabled = m15_fvg_entry_enabled
+        self.htf_crt_enabled = htf_crt_enabled
+        from scalper.crt_confluence import validate_mode
+        self.crt_confluence_mode = validate_mode(crt_confluence_mode)
+        self._crt_used = set()
+        self._crt_frames_cache = {}
+        self._crt_watch_bar = {}
+        self._reclaim_last_closes = {}
+        self._reclaim_history_ready = False
         # RESUME: current_pool = --pool + all realized P&L since inception
         #         (the pool compounds; a losing history shrinks the risk unit).
         # FRESH:  current_pool = --pool exactly. Use this when the run is meant
@@ -351,7 +373,9 @@ class ScalperAgent:
         # trigger behind it. Mirrored in backtest_scalper.py (invariant #2).
         self.trigger_eng = SATriggerEngine(
             enabled_triggers=resolve_enabled_triggers(enabled_triggers,
-                                                      self.vplr_enabled))
+                                                      self.vplr_enabled, htf_crt_enabled),
+            sweep_wick_filter=sweep_wick_filter,
+            sweep_wick_ratio=sweep_wick_ratio)
         self.state_mach  = SABehaviorStateMachine()
         self.trade_log   = SATradeLogger("logs/scalper_log.json")
         self.daily_reset = SADailyReset()
@@ -418,6 +442,12 @@ class ScalperAgent:
         # non-decisional.
         self.rejects = RejectionLog("logs/sa_rejections.json")
         self.incidents = PMORTEM.IncidentJournal("logs/sa_incidents.jsonl")
+        try:
+            self.execution_telemetry = EXEC_TEL.DatagramTelemetryClient()
+        except Exception as e:
+            logger.warning(f"SA: execution telemetry disabled after init failure: {e}")
+            self.execution_telemetry = EXEC_TEL.NullExecutionTelemetry()
+        self._entry_execution: Dict[int, dict] = {}
         # Closed trades awaiting their look-ahead window. A forensic pass run
         # at the instant of close cannot see whether the target printed
         # afterwards — the bars do not exist yet — so the pass is deferred
@@ -442,6 +472,14 @@ class ScalperAgent:
         except Exception as e:
             logger.error(f"SA News: Startup fetch error — {e}")
 
+        priority = [name for name in self.trigger_eng.ALL_TRIGGERS
+                    if name in self.trigger_eng.enabled_triggers
+                    and (name != "VALUE_AREA_FADE" or self.va_fade_enabled)]
+        logger.info("SA CONFIDENCE POLICY: pre-2026-09-07 STB admission restored")
+        logger.info("SA TRIGGER PRIORITY: %s | VP_LIQUIDITY_REACTION=%s | "
+                    "VALUE_AREA_FADE=%s | Era=%s",
+                    " > ".join(priority), self.vplr_enabled,
+                    self.va_fade_enabled, DP.CONFIG_ERA)
         logger.info(
             f"\n"
             f"{'='*60}\n"
@@ -483,6 +521,12 @@ class ScalperAgent:
                 # Run any forensic pass whose look-ahead window has filled.
                 # Observation only — nothing downstream reads the result.
                 self._drain_postmortems(now)
+
+                # First watch, including outside entry sessions. This observes
+                # closed bars only; execution still requires ACTIVE below.
+                if self.htf_crt_enabled:
+                    for symbol in self.symbols:
+                        self._watch_htf_crt(symbol, now)
 
                 # Session and state evaluation
                 sess = self.session.get_state(now)
@@ -670,6 +714,23 @@ class ScalperAgent:
                         None),
                 )
 
+        m15_fvg_plan = None
+        if self.m15_fvg_entry_enabled and not vp_only:
+            if not self._reclaim_history_ready:
+                self.rejects.record("M15_FVG_HISTORY_UNAVAILABLE", symbol, "prior close unknown", now)
+                return
+            quote_tick = mt5.symbol_info_tick(symbol)
+            if quote_tick is None:
+                self.rejects.record("M15_FVG_NO_QUOTE", symbol, "no executable quote", now)
+                return
+            m15_fvg_plan = find_fvg_entry(
+                df_m5, df_m1, quote_tick.bid, quote_tick.ask, now,
+                self._reclaim_last_closes, symbol)
+            if m15_fvg_plan.allow:
+                logger.info(f"SA {symbol}: M15 FVG candidate | {m15_fvg_plan.record()}")
+            elif m15_fvg_plan.reason != "M15_FVG_WAIT_PRICE":
+                self.rejects.record(m15_fvg_plan.reason, symbol, str(m15_fvg_plan.record()), now)
+
         # In VP_ONLY the engine is asked for one detector. This is a narrowing
         # of what may fire, never a widening: the trigger's own contract still
         # has to hold in full.
@@ -682,7 +743,8 @@ class ScalperAgent:
                 profile=vp_profile if self.va_fade_enabled else None,
                 edge_tolerance_frac=DP.VP_EDGE_TOLERANCE_FRAC,
                 poc_band_frac=DP.VP_POC_BAND_FRAC,
-                vplr_ctx=vplr_ctx)
+                vplr_ctx=vplr_ctx, m15_fvg_entry=m15_fvg_plan,
+                htf_crt=self._crt_candidate(symbol, df_m5, df_m1, now) if not vp_only else None)
         finally:
             if vp_only:
                 self.trigger_eng.enabled_triggers = saved
@@ -697,6 +759,8 @@ class ScalperAgent:
             self.rejects.record("NO_TRIGGER", symbol, reason, now)
             return
 
+        analysis_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt) else
+                          float(df_m5['close'].iloc[-1]))
         if trigger.matched_triggers and len(trigger.matched_triggers) > 1:
             logger.info(
                 f"SA {symbol}: {trigger.trigger_type} selected on priority over "
@@ -705,6 +769,30 @@ class ScalperAgent:
         if getattr(trigger, "vplr", None) is not None:
             logger.info(f"SA {symbol}: {trigger.vplr.summary()} | "
                         f"{getattr(vplr_ctx.anchored, 'summary', lambda: '')()}")
+
+        # L-017 is a mandatory sequence check for every entry type. A local
+        # sweep never substitutes for reclaiming broken support/resistance.
+        if self.reclaim_fvg_enabled:
+            if not self._reclaim_history_ready:
+                self.rejects.record("RECLAIM_HISTORY_UNAVAILABLE", symbol,
+                                    "cannot restore prior-entry barrier", now)
+                return
+            gate_tick = mt5.symbol_info_tick(symbol)
+            if gate_tick is None:
+                self.rejects.record("RECLAIM_NO_QUOTE", symbol, "no quote", now)
+                return
+            quote = gate_tick.ask if trigger.direction == "BULLISH" else gate_tick.bid
+            trigger.reclaim = evaluate_reclaim(
+                trigger.direction, df_m5, df_m1, quote,
+                trigger.stop_loss, trigger.tp1, now,
+                self._reclaim_last_closes.get((symbol, trigger.direction)))
+            decision = trigger.reclaim
+            logger.info(f"SA {symbol}: RECLAIM {'passed' if decision.allow else 'BLOCKED'} "
+                        f"{trigger.direction} {trigger.trigger_type} | {decision.record()}")
+            if not decision.allow:
+                self.rejects.record(decision.reason, symbol,
+                                    f"level={decision.level} {decision.record()}", now)
+                return
 
         # ── H1 EMA(18) high/low band — directional permission ────────────────
         # Longs only while price is above both bands, shorts only while below
@@ -719,7 +807,7 @@ class ScalperAgent:
                                          bars=DP.EMA_BAND_BARS)
             band = self.ema_filter.check(
                 trigger_direction = trigger.direction,
-                price             = float(df_m5['close'].iloc[-1]),
+                price             = analysis_price,
                 df_h1_closed      = df_h1_band,
             )
             if not band.allow:
@@ -834,7 +922,7 @@ class ScalperAgent:
             symbol            = symbol,
             trigger_direction = trigger.direction,
             trigger_type      = trigger.trigger_type,
-            current_price     = float(df_m5['close'].iloc[-1]),
+            current_price     = analysis_price,
             df_m5             = df_m5,
             df_h1             = df_h1,
             df_h4             = df_h4,
@@ -854,6 +942,13 @@ class ScalperAgent:
             f"SA {symbol}: STB GATE passed [{stb.confidence}] — {stb.reason} | "
             f"short_term={stb.short_term_bias} htf={stb.htf_trend}{sweep_str}"
         )
+
+        if not DP.entry_confidence_allowed(trigger.confidence, stb.confidence):
+            reason = (f"requires HIGH trigger and STB confidence; "
+                      f"trigger={trigger.confidence} STB={stb.confidence}")
+            logger.info(f"SA {symbol}: CONFIDENCE BLOCKED — {reason}")
+            self.rejects.record("CONFIDENCE", symbol, reason, now)
+            return
 
         # Thin-liquidity filter — require HIGH STB confidence during
         # historically-low-liquidity UTC windows.
@@ -964,7 +1059,7 @@ class ScalperAgent:
                 return
 
             # Gate 3 — LIA TP2 Override
-            if consult.lia_tp2_override:
+            if consult.lia_tp2_override and trigger.fvg_entry is None and trigger.htf_crt is None:
                 trigger.tp2 = consult.lia_tp2_override
                 logger.info(
                     f"SA {symbol}: CONSUL Gate 3 — TP2 realigned to macro H1 pool "
@@ -1032,11 +1127,22 @@ class ScalperAgent:
         )
 
         if self.dry_run:
+            try:
+                telemetry_context = self._execution_observation_context(
+                    symbol, trigger, stb, consult, sess, now, df_m5, df_m1)
+                quote = mt5.symbol_info_tick(symbol)
+                self.execution_telemetry.record_candidate(
+                    symbol, trigger.direction, trigger.trigger_type,
+                    quote, now, telemetry_context)
+            except Exception as e:
+                logger.warning(f"SA {symbol}: candidate telemetry failed: {e}")
             logger.info("SA DRY RUN: Signal generated but not executed.")
             self._log_trade(symbol, trigger, sess, lot_size, ticket=None)
             return
 
-        ticket = self._execute_trade(symbol, trigger, lot_size)
+        ticket = self._execute_trade(
+            symbol, trigger, lot_size, m5_frame=df_m1,
+            observation_inputs=(stb, consult, sess, now, df_m5))
         if not ticket:
             self.rejects.record("EXECUTE_FAIL", symbol,
                                 "broker did not return a ticket", now)
@@ -1072,6 +1178,9 @@ class ScalperAgent:
                 # for attributing the trade.
                 "session": self.session.vp_window_name(now),
                 "vplr": _vplr_record(trigger),
+                "reclaim": trigger.reclaim.record() if trigger.reclaim else None,
+                "m15_fvg": trigger.fvg_entry.record() if trigger.fvg_entry else None,
+                "htf_crt": trigger.htf_crt.record() if trigger.htf_crt else None,
                 "regime": consult.regime,
                 "lots": lot_size,
                 # Cost and risk as they stood at entry. The forensic pass
@@ -1081,12 +1190,75 @@ class ScalperAgent:
                 "spread_pips": spread_pips,
                 "sl_pips": sl_pips_for_check,
                 "risk_usd": self.pool.risk_per_trade_usd,
+                "execution": getattr(self, "_entry_execution", {}).pop(ticket, {}),
             }
             self._log_trade(symbol, trigger, sess, lot_size, ticket)
 
     # ── Trade Execution ───────────────────────────────────────────────────────
 
-    def _execute_trade(self, symbol: str, trigger, lot_size: float) -> Optional[int]:
+    def _execution_observation_context(self, symbol: str, trigger, stb,
+                                       consult, sess, now: datetime,
+                                       df_m15, df_m5) -> dict:
+        """Serialize already-known tags; the worker performs all enrichment."""
+        vplr = _vplr_record(trigger) or {}
+        entry_price = float(trigger.entry_price)
+        risk = abs(entry_price - float(trigger.stop_loss))
+        opposing = abs(float(trigger.tp1) - entry_price) / risk if risk else None
+        raw_event = str(getattr(stb, "recent_sweep", "") or "NONE").upper()
+        allowed_events = {
+            "D1_BSL_RAID", "D1_SSL_RAID", "W1_BSL_RAID", "W1_SSL_RAID",
+            "MN1_BSL_RAID", "MN1_SSL_RAID", "INTERNAL_SWEEP", "NONE",
+        }
+        event = raw_event if raw_event in allowed_events else (
+            "INTERNAL_SWEEP" if "SWEEP" in raw_event else "NONE")
+        raid_time_msc = None
+        raid_time = vplr.get("raid_time")
+        if raid_time:
+            try:
+                parsed = datetime.fromisoformat(str(raid_time).replace("Z", "+00:00"))
+                raid_time_msc = int(parsed.timestamp() * 1000)
+            except ValueError:
+                pass
+        vp_level = str(vplr.get("vp_level") or "").upper()
+        location = vp_level if vp_level in {"POC", "VAH", "VAL"} else (
+            "FVG" if getattr(trigger, "fvg_entry", None)
+            or getattr(trigger, "htf_crt", None) else "OTHER")
+        raid_depth_atr = vplr.get("sweep_depth_atr")
+        session_start = None
+        if sess.window is not None:
+            session_start = now.replace(
+                hour=sess.window.start.hour, minute=sess.window.start.minute,
+                second=0, microsecond=0).isoformat()
+        return {
+            "telemetry_authority": "OBSERVATION_ONLY",
+            "config_era": DP.CONFIG_ERA,
+            "liquidity_event_type": event,
+            "liquidity_event_raw": raw_event,
+            "reference_tf": vplr.get("profile_type") or "UNKNOWN",
+            "reference_level": vplr.get("level_source") or "UNKNOWN",
+            "raid_depth_atr": raid_depth_atr,
+            "raid_depth_spreads": None,
+            "reclaim_bars": None,
+            "failed_acceptance": None,
+            "m15_mss": bool(vplr.get("mss_time")) or None,
+            "m5_mss": None,
+            "entry_location": location,
+            "opposing_liquidity_distance_R": opposing,
+            "news_mode": "CLEAR",
+            "raid_session": "UNKNOWN",
+            "entry_session": self.session.vp_window_name(now),
+            "regime": getattr(consult, "regime", "UNKNOWN"),
+            "regime_confidence": getattr(consult, "regime_confidence", None),
+            "session_start_utc": session_start,
+            "entry_price_for_context": entry_price,
+            "raid_leg_vwap": None,
+            "distance_to_leg_vwap_atr": None,
+            "raid_time_msc": raid_time_msc,
+        }
+
+    def _execute_trade(self, symbol: str, trigger, lot_size: float,
+                       telemetry_context: Optional[dict] = None,
+                       m5_frame=None, observation_inputs=None) -> Optional[int]:
         """Place market order via MT5."""
         try:
             tick = mt5.symbol_info_tick(symbol)
@@ -1097,6 +1269,29 @@ class ScalperAgent:
             order_type = mt5.ORDER_TYPE_BUY if trigger.direction == "BULLISH" else mt5.ORDER_TYPE_SELL
             price      = tick.ask if trigger.direction == "BULLISH" else tick.bid
             point      = info.point
+
+            crt_plan = getattr(trigger, "htf_crt", None)
+            fvg_plan = crt_plan or getattr(trigger, "fvg_entry", None)
+            quote_guard = ((lambda p, q: crt_quote_allowed(p, q, datetime.now(timezone.utc)))
+                           if crt_plan else entry_quote_allowed)
+            family = "CRT" if crt_plan else "M15_FVG"
+            if fvg_plan is not None and not quote_guard(fvg_plan, price):
+                logger.warning(f"SA {symbol}: {family}_QUOTE_MOVED — skip entry at {price}")
+                return None
+            if fvg_plan is not None:
+                quoted_trigger = replace(trigger, entry_price=price)
+                valid, why = self.trigger_eng.step3_validate(
+                    quoted_trigger, (tick.ask-tick.bid)/point/10., symbol,
+                    sl_pips=abs(price-trigger.stop_loss)/point/10.)
+                if not valid:
+                    logger.warning(f"SA {symbol}: {family}_FINAL_COST_GATE — {why}")
+                    return None
+
+            if getattr(self, "reclaim_fvg_enabled", False):
+                permission = getattr(trigger, "reclaim", None)
+                if permission is None or not entry_in_reclaim_zone(permission, price):
+                    logger.warning(f"SA {symbol}: RECLAIM_QUOTE_MOVED — skip entry at {price}")
+                    return None
 
             # Round SL/TP to symbol digits
             digits = info.digits
@@ -1113,13 +1308,60 @@ class ScalperAgent:
                 "tp":        tp,
                 "deviation": 10,
                 "magic":     MAGIC_SCALPER,
-                "comment":   f"SA_{trigger.trigger_type[:4]}",
+                "comment":   (DP.CRT_ORDER_PREFIX + crt_plan.setup_id if crt_plan else
+                              DP.M15_FVG_ORDER_COMMENT if fvg_plan else
+                              f"SA_{trigger.trigger_type[:4]}"),
                 "type_time": mt5.ORDER_TIME_GTC,
                 "type_filling": mt5.ORDER_FILLING_IOC,
             }
 
+            decision_time = datetime.now(timezone.utc)
+            submit_time = datetime.now(timezone.utc)
+            submit_clock = time.perf_counter_ns()
             result = mt5.order_send(request)
+            confirm_time = datetime.now(timezone.utc)
+            latency_ms = (time.perf_counter_ns() - submit_clock) / 1_000_000
+            # All telemetry enrichment happens after the broker has answered.
+            # Even a slow tick-history query therefore cannot delay this order.
+            if telemetry_context is None and observation_inputs is not None:
+                try:
+                    stb, consult, sess, observed_at, df_m15 = observation_inputs
+                    telemetry_context = self._execution_observation_context(
+                        symbol, trigger, stb, consult, sess, observed_at,
+                        df_m15, m5_frame)
+                except Exception as e:
+                    logger.warning(f"SA {symbol}: context telemetry failed: {e}")
+                    telemetry_context = {}
+            telemetry_context = telemetry_context or {}
+            try:
+                self.execution_telemetry.record_candidate(
+                    symbol, trigger.direction, trigger.trigger_type,
+                    tick, decision_time, telemetry_context)
+            except Exception as e:
+                logger.warning(f"SA {symbol}: candidate telemetry failed: {e}")
+            try:
+                self.execution_telemetry.record_entry(
+                    symbol=symbol, direction=trigger.direction,
+                    stop_price=sl, decision_tick=tick,
+                    decision_time=decision_time, submit_time=submit_time,
+                    confirm_time=confirm_time, latency_ms=latency_ms,
+                    request=request, result=result, context=telemetry_context,
+                    m5_frame=m5_frame)
+            except Exception as e:
+                logger.warning(f"SA {symbol}: entry telemetry failed: {e}")
             if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                entry_cache = getattr(self, "_entry_execution", None)
+                if entry_cache is None:
+                    entry_cache = {}
+                    self._entry_execution = entry_cache
+                entry_cache[result.order] = {
+                    "fill_price": getattr(result, "price", None),
+                    "deal_ticket": getattr(result, "deal", None),
+                    "request_id": getattr(result, "request_id", None),
+                    "execution_latency_ms": latency_ms,
+                }
+                if crt_plan:
+                    self._crt_used.add(crt_plan.setup_id)
                 logger.info(f"SA Trade executed: {symbol} {trigger.direction} "
                             f"Lot={lot_size:.2f} Ticket={result.order}")
                 return result.order
@@ -1211,6 +1453,16 @@ class ScalperAgent:
 
         pnl = self._settled_pnl(ticket)
         if pnl is not None:
+            try:
+                telemetry = getattr(self, "execution_telemetry", None)
+                if telemetry is not None:
+                    telemetry.record_settled_exit(
+                        ticket=ticket, info=info,
+                        deals=self._position_deals(ticket),
+                        outcome=outcome or ("WIN_TP1" if pnl > 0 else "LOSS"),
+                        observed_time=now)
+            except Exception as e:
+                logger.warning(f"SA: settled-exit telemetry failed for {ticket}: {e}")
             self._on_trade_closed(
                 ticket, outcome or ("WIN_TP1" if pnl > 0 else "LOSS"),
                 pnl, now)
@@ -1260,6 +1512,12 @@ class ScalperAgent:
         the one case where pausing is the conservative reading.
         """
         now = now or datetime.now(timezone.utc)
+        if (getattr(self, "reclaim_fvg_enabled", False)
+                or getattr(self, "m15_fvg_entry_enabled", False)
+                or getattr(self, "htf_crt_enabled", False)):
+            info = self._open_trades.get(ticket)
+            if info:
+                self._reclaim_last_closes[(info["symbol"], info["direction"])] = now
         self.pool.register_close(pnl)
         self.trade_log.log_close(ticket, outcome, pnl,
                                  self.state_mach.state.value)
@@ -1509,7 +1767,28 @@ class ScalperAgent:
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
 
-        result  = mt5.order_send(request)
+        direction = "BULLISH" if pos_type == mt5.ORDER_TYPE_BUY else "BEARISH"
+        submit_time = datetime.now(timezone.utc)
+        submit_clock = time.perf_counter_ns()
+        result = mt5.order_send(request)
+        confirm_time = datetime.now(timezone.utc)
+        latency_ms = (time.perf_counter_ns() - submit_clock) / 1_000_000
+        try:
+            telemetry = getattr(self, "execution_telemetry", None)
+            if telemetry is not None:
+                telemetry.record_exit_submission(
+                    ticket=ticket, symbol=symbol, direction=direction,
+                    exit_type=reason, reference_price=price,
+                    submit_time=submit_time, confirm_time=confirm_time,
+                    latency_ms=latency_ms, request=request, result=result)
+            tracked = getattr(self, "_open_trades", {}).get(ticket)
+            if tracked is not None:
+                tracked["exit_telemetry"] = {
+                    "exit_type": reason, "reference_price": price,
+                    "latency_ms": latency_ms,
+                }
+        except Exception as e:
+            logger.warning(f"SA: exit-submission telemetry failed for {ticket}: {e}")
         retcode = getattr(result, "retcode", None)
         if retcode != mt5.TRADE_RETCODE_DONE:
             logger.error(
@@ -1586,10 +1865,64 @@ class ScalperAgent:
             sa_pool_risk_pct = round(self.pool.risk_pct * 100, 2),
             sa_state_after   = self.state_mach.state.value,
             ticket           = ticket,
+            notes            = ("HTF_CRT_SWEEP " + json.dumps(trigger.htf_crt.record())
+                                if getattr(trigger, "htf_crt", None) else
+                                "M15_FVG_ENTRY " + json.dumps(trigger.fvg_entry.record())
+                                if getattr(trigger, "fvg_entry", None) else ""),
         )
         self.trade_log.log_open(record)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _crt_frames(self, symbol, now):
+        stamp = pd.Timestamp(now).floor("15min")
+        cached = self._crt_frames_cache.get(symbol)
+        if cached is None or cached[0] != stamp:
+            frames = {tf: self._get_ohlcv(symbol, code, bars=DP.CRT_RANGE_BARS)
+                      for tf, code in DP.CRT_TIMEFRAMES.items()}
+            self._crt_frames_cache[symbol] = (stamp, frames)
+        return self._crt_frames_cache[symbol][1]
+
+    def _crt_plans(self, symbol, m15, m5, now):
+        tick = mt5.symbol_info_tick(symbol)
+        if tick is None:
+            return []
+        return watch_crt(m15, m5, self._crt_frames(symbol, now), tick.bid, tick.ask,
+                         now, self._crt_used, self._reclaim_last_closes, symbol,
+                         getattr(self, "crt_confluence_mode", DP.CRT_CONFLUENCE_MODE))
+
+    def _watch_htf_crt(self, symbol, now):
+        stamp = pd.Timestamp(now).floor("15min")
+        if self._crt_watch_bar.get(symbol) == stamp:
+            return
+        plans = self._crt_plans(
+            symbol, self._get_ohlcv(symbol, self.TF_TRIGGER, bars=DP.TRIGGER_BARS),
+            self._get_ohlcv(symbol, self.TF_CONFIRM, bars=DP.CONFIRM_BARS), now)
+        # A missing first tick/bar is transient; retry on the next loop rather
+        # than suppressing observation for the entire quarter-hour.
+        if plans and all(p.reason != "CRT_LTF_DATA_UNAVAILABLE" for p in plans):
+            self._crt_watch_bar[symbol] = stamp
+        for p in plans:
+            logger.info(f"SA {symbol}: HTF CRT WATCH | {p.record()}")
+
+    def _crt_candidate(self, symbol, m15, m5, now):
+        if not getattr(self, "htf_crt_enabled", False):
+            return None
+        if not self._reclaim_history_ready:
+            self.rejects.record("CRT_HISTORY_UNAVAILABLE", symbol, "entry history unavailable", now)
+            return None
+        plans = self._crt_plans(symbol, m15, m5, now)
+        for plan in plans:
+            if plan.confluence and plan.confluence["baseline_ready"]:
+                logger.info(f"SA {symbol}: CRT CONFLUENCE | {plan.record()}")
+                if not plan.allow:
+                    self.rejects.record(plan.reason, symbol, str(plan.confluence), now)
+        p = select_crt(plans)
+        if p.allow:
+            logger.info(f"SA {symbol}: HTF CRT candidate | {p.record()}")
+        elif p.reason == "CRT_DIRECTION_CONFLICT":
+            self.rejects.record(p.reason, symbol, "opposing ready HTF setups", now)
+        return p
 
     def _journal_closed_trade(self, ticket: int, outcome: str, pnl: float,
                               now: datetime):
@@ -1725,7 +2058,19 @@ class ScalperAgent:
             inception   = self._load_or_init_inception()
 
             # Cumulative deals (inception → now)
-            all_deals = mt5.history_deals_get(inception, now) or []
+            all_deals = mt5.history_deals_get(inception, now)
+            if all_deals is None:
+                raise RuntimeError("broker history unavailable; entry barrier cannot be restored")
+            self._reclaim_last_closes = close_barriers(all_deals, self.SA_MAGIC)
+            self._crt_used = used_setups(all_deals, self.SA_MAGIC)
+            logger.info(f"SA HTF CRT={'ON' if self.htf_crt_enabled else 'OFF'} | "
+                        f"confluence={self.crt_confluence_mode} | "
+                        f"priority=MN1/W1/D1 | restored {len(self._crt_used)} used setups")
+            self._reclaim_history_ready = True
+            logger.info(f"SA RECLAIM gate={'ON' if self.reclaim_fvg_enabled else 'OFF'} | "
+                        f"restored {len(self._reclaim_last_closes)} directional close barriers")
+            logger.info(f"SA M15 FVG entry={'ON' if self.m15_fvg_entry_enabled else 'OFF'} | "
+                        "target before broken structure; Guardian TP extension disabled for this model")
             sa_all = [d for d in all_deals if getattr(d, "magic", 0) == self.SA_MAGIC]
             cumulative_pnl = sum(self._deal_pnl(d) for d in sa_all)
 
@@ -2127,6 +2472,28 @@ def main():
                         default=DP.LEG_CONF_MODE,
                         choices=list(LEG_CONF_MODES),
                         help="CONFLUENCE_ONLY | AT_LEVEL | LVN_VETO")
+    parser.add_argument("--sweep-wick-filter", dest="sweep_wick_filter",
+                        action=argparse.BooleanOptionalAction,
+                        default=DP.SWEEP_WICK_FILTER_ENABLED,
+                        help="L-016: require the sweeping candle's wick to be "
+                             "at least --sweep-wick-ratio of its own range "
+                             "before SWEEP_REJECTION is admitted")
+    parser.add_argument("--reclaim-fvg", action=argparse.BooleanOptionalAction,
+                        default=DP.RECLAIM_FVG_ENABLED,
+                        help="Require displacement reclaim and a subsequent FVG return "
+                             "at broken support/resistance (L-017; default on)")
+    parser.add_argument("--htf-crt", action=argparse.BooleanOptionalAction,
+                        default=DP.CRT_ENABLED, help="Priority D1/W1/MN1 sweep, M15 reclaim and FVG return")
+    parser.add_argument("--crt-confluence-mode", choices=DP.CRT_CONFLUENCE_MODES,
+                        default=DP.CRT_CONFLUENCE_MODE,
+                        help="OBSERVE records MSS/retest; strict modes are unvalidated research arms")
+    parser.add_argument("--m15-fvg-entry", action=argparse.BooleanOptionalAction,
+                        default=DP.M15_FVG_ENTRY_ENABLED,
+                        help="Enter confirmed M15 FVGs with TP before broken structure (L-018)")
+    parser.add_argument("--sweep-wick-ratio", type=float,
+                        default=DP.SWEEP_WICK_RATIO_MIN,
+                        help="Minimum rejecting-wick share of the sweeping "
+                             "candle's range (ledger L-016)")
     parser.add_argument("--vp-gate-mode", type=str, default=DP.VP_GATE_MODE,
                         choices=list(VP_MODES),
                         help="RANGING_ONLY: apply only when the regime "
@@ -2166,7 +2533,7 @@ def main():
     parser.add_argument("--sessions", type=str, default=None,
                         help="Comma-separated session whitelist (LONDON_OPEN,"
                              "PRE_LONDON,LONDON_NY,TOKYO_OPEN,NY_LUNCH_REV). "
-                             "Default: all five.")
+                             "Default: TOKYO_OPEN,LONDON_NY.")
     parser.add_argument("--loss-cooldown-policy", type=str,
                         default="NEXT_UTC_HOUR",
                         choices=["NEXT_UTC_HOUR", "FIXED_MINUTES"],
@@ -2243,6 +2610,12 @@ def main():
         vplr_session_override= args.vplr_session_override,
         leg_conf_enabled     = args.leg_conf,
         leg_conf_mode        = args.leg_conf_mode,
+        sweep_wick_filter    = args.sweep_wick_filter,
+        sweep_wick_ratio     = args.sweep_wick_ratio,
+        reclaim_fvg_enabled  = args.reclaim_fvg,
+        m15_fvg_entry_enabled= args.m15_fvg_entry,
+        htf_crt_enabled      = args.htf_crt,
+        crt_confluence_mode  = args.crt_confluence_mode,
         vp_gate_enabled      = args.vp_gate,
         vp_gate_mode         = args.vp_gate_mode,
         vp_poc_band_frac     = args.vp_poc_band,

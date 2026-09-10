@@ -1,0 +1,6 @@
+{
+  "scalper": 5720,
+  "guardian": 5740,
+  "watchdog": 7704,
+  "scalper_command": "C:\\Users\\nauman.afzal.ORIENTPET\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe -E \"D:\\Hermes Quant\\Quant GPT Test Claude - Final\\apex_ai\\scalper_agent.py\" --pool 1000 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH"
+}

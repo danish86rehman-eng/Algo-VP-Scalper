@@ -1,0 +1,168 @@
+{
+  "window": "SMOKE",
+  "arm": "VP_LIQUIDITY_REACTION",
+  "start": "2026-09-04 00:00:00+00:00",
+  "end_exclusive": "2026-09-05 00:00:00+00:00",
+  "trades": 1,
+  "pnl": -13.36,
+  "ending_balance": 986.64,
+  "gross_pnl": -12.31,
+  "win_rate_pct": 0.0,
+  "profit_factor": 0.0,
+  "sum_net_r": -0.4304123711340206,
+  "max_closed_balance_drawdown": 13.36,
+  "max_closed_balance_drawdown_pct": 1.3360000000000014,
+  "cost_overlay_fixed_trades": {
+    "0.17": -12.82,
+    "0.35": -13.36,
+    "0.75": -14.56
+  },
+  "folds": [
+    {
+      "trades": 1,
+      "pnl": -13.36,
+      "ending_balance": 986.64,
+      "gross_pnl": -12.31,
+      "win_rate_pct": 0.0,
+      "profit_factor": 0.0,
+      "sum_net_r": -0.4304123711340206,
+      "max_closed_balance_drawdown": 13.36,
+      "max_closed_balance_drawdown_pct": 1.3360000000000014,
+      "cost_overlay_fixed_trades": {
+        "0.17": -12.82,
+        "0.35": -13.36,
+        "0.75": -14.56
+      }
+    },
+    {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    }
+  ],
+  "trigger_breakdown": {
+    "HTF_CRT_SWEEP": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "FVG_FILL": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "SWEEP_REJECTION": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "BOS_RETEST": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "JUDAS": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    }
+  },
+  "triggers_detected": {
+    "VP_LIQUIDITY_REACTION": 7
+  },
+  "rejections": {
+    "SESSION": 156,
+    "NO_TRIGGER": 66,
+    "VPLR_FUNNEL:raid without reclaim/MSS/confluence": 24,
+    "COOLDOWN": 12,
+    "SYMBOL_DEDUP": 11,
+    "RECLAIM_WAIT_LEVEL": 6,
+    "M15_FVG_CONSUMED": 1
+  },
+  "arbitration_overlaps": {},
+  "possible_promotions": {},
+  "arbitration_switches": 0,
+  "elapsed_seconds": 21.738775600000736
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "decision_utc": "2026-09-02T08:00:20+00:00",
+    "last_closed_trigger_bar_open": "2026-09-02 07:45:00+00:00",
+    "trigger": {
+      "detected": true,
+      "trigger_type": "SWEEP_REJECTION",
+      "direction": "BULLISH",
+      "entry_price": 4323.265,
+      "stop_loss": 4317.3308,
+      "tp1": 4335.1334000000015,
+      "tp2": 4341.067600000002,
+      "confidence": "HIGH",
+      "description": "SSL 4323.1278 swept, bullish rejection confirmed",
+      "swept_level": 4323.1278,
+      "requires_displacement": false,
+      "matched_triggers": [],
+      "vplr": null,
+      "wick_ratio": 0.2139361260888072
+    },
+    "stb": {
+      "allow": true,
+      "confidence": "MEDIUM",
+      "short_term_bias": "BULLISH",
+      "htf_trend": "BEARISH",
+      "recent_sweep": null,
+      "reason": "Short-term BULLISH matches trigger; HTF=BEARISH"
+    },
+    "sweep_extreme_bar_open": "2026-09-02 07:00:00+00:00",
+    "sweep_extreme_low": 4319.137,
+    "sweep_extreme_high": 4331.192,
+    "nearest_ssl": 4323.1278,
+    "nearest_bsl": 4325.103
+  },
+  {
+    "decision_utc": "2026-09-02T08:21:08+00:00",
+    "last_closed_trigger_bar_open": "2026-09-02 08:00:00+00:00",
+    "trigger": {
+      "detected": true,
+      "trigger_type": "SWEEP_REJECTION",
+      "direction": "BULLISH",
+      "entry_price": 4325.452,
+      "stop_loss": 4318.8527,
+      "tp1": 4338.6506,
+      "tp2": 4345.2499,
+      "confidence": "HIGH",
+      "description": "SSL 4324.2577 swept, bullish rejection confirmed",
+      "swept_level": 4324.25775,
+      "requires_displacement": false,
+      "matched_triggers": [],
+      "vplr": null,
+      "wick_ratio": 0.48614118666092293
+    },
+    "stb": {
+      "allow": true,
+      "confidence": "MEDIUM",
+      "short_term_bias": "BULLISH",
+      "htf_trend": "BEARISH",
+      "recent_sweep": null,
+      "reason": "Short-term BULLISH matches trigger; HTF=BEARISH"
+    },
+    "sweep_extreme_bar_open": "2026-09-02 07:45:00+00:00",
+    "sweep_extreme_low": 4320.608,
+    "sweep_extreme_high": 4325.226,
+    "nearest_ssl": 4324.25775,
+    "nearest_bsl": 4326.65867
+  }
+]

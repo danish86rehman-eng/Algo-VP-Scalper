@@ -1,0 +1,75 @@
+14638: 2026-09-02 08:00:21,511Z [TGA] INFO: 
+14639: [TGA POSITION REGISTRY]
+14640: Position ID        : 494903819
+14641: Origin Agent       : SA
+14642: Instrument         : XAUUSD
+14643: Direction          : BUY
+14644: Entry Price        : 4324.04800
+14645: Original SL        : 4317.33100
+14646: Original TP        : 4335.13300
+14647: Entry ATR          : 4.51414
+14648: Entry Time         : 2026-09-02T08:00:06+00:00
+14649: Peak Profit (pips) : 0.0
+14650: Peak Profit (R)    : 0.00R
+14651: Peak Adverse (R)   : 0.00R
+14652: SL Stage           : STAGE 0
+14653: Breakeven Reached  : No
+14654: 1R Reached         : No
+14655: 2R Reached         : No
+14656: Early Close Armed  : No
+14657: 
+14658: 2026-09-02 08:10:50,108Z [TGA] INFO: 
+14659: [TGA ACTION LOG]
+14660: Timestamp         : 2026-09-02T08:10:50.050440+00:00
+14661: Position ID       : 494903819
+14662: Origin Agent      : SA
+14663: Action Type       : STAGE_TRANSITION
+14664: Previous SL       : 4317.331
+14665: New SL            : 4324.048000000001
+14666: Previous TP       : 4335.133
+14667: New TP            : 4335.133
+14668: Current Profit (R): 1.01
+14669: Peak Profit (R)   : 1.01
+14670: Peak Adverse (R)  : 0.00
+14671: SL Stage          : 0
+14672: Trigger           : Trailing SL Stage 1
+14673: 
+14674: 2026-09-02 08:16:06,861Z [TGA] INFO: 
+14675: [TGA ACTION LOG]
+14676: Timestamp         : 2026-09-02T08:16:06.781801+00:00
+14677: Position ID       : 494903819
+14678: Origin Agent      : SA
+14679: Action Type       : EARLY_CLOSE
+14680: Previous SL       : 4324.048
+14681: New SL            : 4324.048
+14682: Previous TP       : 4335.133
+14683: New TP            : 4335.133
+14684: Current Profit (R): 0.41
+14685: Peak Profit (R)   : 1.12
+14686: Peak Adverse (R)  : 0.00
+14687: SL Stage          : 1
+14688: Trigger           : Trigger 1: Bearish Engulfing
+14689: 
+14690: 2026-09-02 08:16:07,587Z [TGA] INFO: TGA closed position 494903819 at market.
+14691: 2026-09-02 08:16:09,588Z [TGA] INFO: TGA: Position 494903819 closed. Removing from registry.
+14692: 2026-09-02 08:21:09,716Z [TGA] INFO: 
+14693: [TGA POSITION REGISTRY]
+14694: Position ID        : 494906413
+14695: Origin Agent       : SA
+14696: Instrument         : XAUUSD
+14697: Direction          : BUY
+14698: Entry Price        : 4325.53800
+14699: Original SL        : 4318.85300
+14700: Original TP        : 4338.65100
+14701: Entry ATR          : 4.39336
+14702: Entry Time         : 2026-09-02T08:20:54+00:00
+14703: Peak Profit (pips) : 0.0
+14704: Peak Profit (R)    : 0.00R
+14705: Peak Adverse (R)   : 0.00R
+14706: SL Stage           : STAGE 0
+14707: Breakeven Reached  : No
+14708: 1R Reached         : No
+14709: 2R Reached         : No
+14710: Early Close Armed  : No
+14711: 
+14712: 2026-09-02 08:52:09,174Z [TGA] INFO: TGA: Position 494906413 closed. Removing from registry.

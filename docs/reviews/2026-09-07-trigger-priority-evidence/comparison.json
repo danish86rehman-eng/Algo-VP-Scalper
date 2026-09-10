@@ -1,0 +1,2244 @@
+{
+  "created_utc": "2026-09-07 09:24:10.763343+00:00",
+  "ranked": [
+    "SWEEP_REJECTION",
+    "JUDAS",
+    "FVG_FILL",
+    "HTF_CRT_SWEEP",
+    "BOS_RETEST"
+  ],
+  "selected_priority_arms": [
+    "SWEEP_REJECTION",
+    "JUDAS"
+  ],
+  "summaries": {
+    "HTF_CRT_SWEEP": {
+      "pooled": {
+        "trades": 0,
+        "pnl": 0,
+        "gross_pnl": 0,
+        "win_rate_pct": null,
+        "profit_factor": null,
+        "sum_net_r": 0,
+        "cost_overlay_fixed_trades": {
+          "0.17": 0,
+          "0.35": 0,
+          "0.75": 0
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        },
+        "W2": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        },
+        "RECENT": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "HTF_CRT_SWEEP": 1
+        },
+        "W2": {},
+        "RECENT": {}
+      },
+      "gate_rejections": {
+        "W1": {
+          "STEP3:HTF_CRT_SWEEP": 1
+        },
+        "W2": {},
+        "RECENT": {}
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    },
+    "FVG_FILL": {
+      "pooled": {
+        "trades": 7,
+        "pnl": 70.58,
+        "gross_pnl": 82.48,
+        "win_rate_pct": 42.857142857142854,
+        "profit_factor": 1.723971689404041,
+        "sum_net_r": 2.319357379824091,
+        "cost_overlay_fixed_trades": {
+          "0.17": 76.7,
+          "0.35": 70.58,
+          "0.75": 56.98
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 2,
+          "pnl": 88.05,
+          "ending_balance": 1088.05,
+          "gross_pnl": 90.85,
+          "win_rate_pct": 100.0,
+          "profit_factor": null,
+          "sum_net_r": 2.969201495294508,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 89.49,
+            "0.35": 88.05,
+            "0.75": 84.85
+          }
+        },
+        "W2": {
+          "trades": 5,
+          "pnl": -17.47,
+          "ending_balance": 982.53,
+          "gross_pnl": -8.37,
+          "win_rate_pct": 20.0,
+          "profit_factor": 0.820802133552159,
+          "sum_net_r": -0.649844115470417,
+          "max_closed_balance_drawdown": 65.47,
+          "max_closed_balance_drawdown_pct": 6.247137404580166,
+          "cost_overlay_fixed_trades": {
+            "0.17": -12.79,
+            "0.35": -17.47,
+            "0.75": -27.87
+          }
+        },
+        "RECENT": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "FVG_FILL": 9
+        },
+        "W2": {
+          "FVG_FILL": 10
+        },
+        "RECENT": {}
+      },
+      "gate_rejections": {
+        "W1": {
+          "RECLAIM_FVG_INVALIDATED:FVG_FILL": 4,
+          "STB/opposes_short_term:FVG_FILL": 1,
+          "RECLAIM_RETURN_STALE:FVG_FILL": 1,
+          "RECLAIM_RETURN_UNCONFIRMED:FVG_FILL": 1
+        },
+        "W2": {
+          "STB/opposes_short_term:FVG_FILL": 3,
+          "RECLAIM_RETURN_STALE:FVG_FILL": 1,
+          "STB/range_guard:FVG_FILL": 1
+        },
+        "RECENT": {}
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 1,
+            "pnl": 78.81,
+            "ending_balance": 1078.81,
+            "gross_pnl": 79.86,
+            "win_rate_pct": 100.0,
+            "profit_factor": null,
+            "sum_net_r": 2.6688113782593974,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 79.35,
+              "0.35": 78.81,
+              "0.75": 77.61
+            }
+          },
+          {
+            "trades": 1,
+            "pnl": 9.24,
+            "ending_balance": 1009.24,
+            "gross_pnl": 10.99,
+            "win_rate_pct": 100.0,
+            "profit_factor": null,
+            "sum_net_r": 0.30039011703511054,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 10.14,
+              "0.35": 9.24,
+              "0.75": 7.24
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 3,
+            "pnl": 46.6,
+            "ending_balance": 1046.6,
+            "gross_pnl": 51.85,
+            "win_rate_pct": 33.333333333333336,
+            "profit_factor": 2.394374625972471,
+            "sum_net_r": 1.4777843650516431,
+            "max_closed_balance_drawdown": 32.02,
+            "max_closed_balance_drawdown_pct": 3.201999999999998,
+            "cost_overlay_fixed_trades": {
+              "0.17": 49.3,
+              "0.35": 46.6,
+              "0.75": 40.6
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 2,
+            "pnl": -64.07,
+            "ending_balance": 935.93,
+            "gross_pnl": -60.22,
+            "win_rate_pct": 0.0,
+            "profit_factor": 0.0,
+            "sum_net_r": -2.12762848052206,
+            "max_closed_balance_drawdown": 64.07,
+            "max_closed_balance_drawdown_pct": 6.407000000000005,
+            "cost_overlay_fixed_trades": {
+              "0.17": -62.09,
+              "0.35": -64.07,
+              "0.75": -68.47
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    },
+    "SWEEP_REJECTION": {
+      "pooled": {
+        "trades": 128,
+        "pnl": 295.82,
+        "gross_pnl": 437.22,
+        "win_rate_pct": 46.875,
+        "profit_factor": 1.1466357354588623,
+        "sum_net_r": 8.511840331233586,
+        "cost_overlay_fixed_trades": {
+          "0.17": 368.54,
+          "0.35": 295.82,
+          "0.75": 134.22
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 50,
+          "pnl": -119.94,
+          "ending_balance": 880.06,
+          "gross_pnl": -74.09,
+          "win_rate_pct": 42.0,
+          "profit_factor": 0.8459918591661424,
+          "sum_net_r": -3.299007391044696,
+          "max_closed_balance_drawdown": 237.53,
+          "max_closed_balance_drawdown_pct": 23.18270544602773,
+          "cost_overlay_fixed_trades": {
+            "0.17": -96.36,
+            "0.35": -119.94,
+            "0.75": -172.34
+          }
+        },
+        "W2": {
+          "trades": 78,
+          "pnl": 415.76,
+          "ending_balance": 1415.76,
+          "gross_pnl": 511.31,
+          "win_rate_pct": 50.0,
+          "profit_factor": 1.3356720141451166,
+          "sum_net_r": 11.810847722278282,
+          "max_closed_balance_drawdown": 177.23,
+          "max_closed_balance_drawdown_pct": 17.723000000000013,
+          "cost_overlay_fixed_trades": {
+            "0.17": 464.9,
+            "0.35": 415.76,
+            "0.75": 306.56
+          }
+        },
+        "RECENT": {
+          "trades": 9,
+          "pnl": 232.5,
+          "ending_balance": 1232.5,
+          "gross_pnl": 242.3,
+          "win_rate_pct": 77.77777777777777,
+          "profit_factor": 6.122273628552544,
+          "sum_net_r": 6.200439907777729,
+          "max_closed_balance_drawdown": 40.05,
+          "max_closed_balance_drawdown_pct": 3.147224077639382,
+          "cost_overlay_fixed_trades": {
+            "0.17": 237.54,
+            "0.35": 232.5,
+            "0.75": 221.3
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "SWEEP_REJECTION": 2080
+        },
+        "W2": {
+          "SWEEP_REJECTION": 1974
+        },
+        "RECENT": {
+          "SWEEP_REJECTION": 88
+        }
+      },
+      "gate_rejections": {
+        "W1": {
+          "RECLAIM_WAIT_LEVEL:SWEEP_REJECTION": 1444,
+          "RECLAIM_WAIT_DISPLACEMENT:SWEEP_REJECTION": 155,
+          "RECLAIM_WAIT_FVG:SWEEP_REJECTION": 84,
+          "LOT_FLOOR:SWEEP_REJECTION": 74,
+          "STEP3:SWEEP_REJECTION": 73,
+          "STB/range_guard:SWEEP_REJECTION": 52,
+          "CONSUL_GATE1_REGIME:SWEEP_REJECTION": 41,
+          "RECLAIM_INVALID_GEOMETRY:SWEEP_REJECTION": 39,
+          "RECLAIM_WAIT_RETURN:SWEEP_REJECTION": 34,
+          "RECLAIM_RETURN_STALE:SWEEP_REJECTION": 19,
+          "STB/dont_chase:SWEEP_REJECTION": 5,
+          "RECLAIM_FVG_INVALIDATED:SWEEP_REJECTION": 5,
+          "CRG:SWEEP_REJECTION": 3,
+          "RECLAIM_RETURN_UNCONFIRMED:SWEEP_REJECTION": 2
+        },
+        "W2": {
+          "RECLAIM_WAIT_LEVEL:SWEEP_REJECTION": 1390,
+          "RECLAIM_WAIT_DISPLACEMENT:SWEEP_REJECTION": 171,
+          "RECLAIM_WAIT_FVG:SWEEP_REJECTION": 98,
+          "CONSUL_GATE1_REGIME:SWEEP_REJECTION": 58,
+          "RECLAIM_WAIT_RETURN:SWEEP_REJECTION": 47,
+          "RECLAIM_INVALID_GEOMETRY:SWEEP_REJECTION": 35,
+          "STB/range_guard:SWEEP_REJECTION": 24,
+          "STB/dont_chase:SWEEP_REJECTION": 17,
+          "RECLAIM_RETURN_STALE:SWEEP_REJECTION": 15,
+          "RECLAIM_FVG_INVALIDATED:SWEEP_REJECTION": 15,
+          "LOT_FLOOR:SWEEP_REJECTION": 12,
+          "RECLAIM_RETURN_UNCONFIRMED:SWEEP_REJECTION": 6,
+          "STEP3:SWEEP_REJECTION": 6,
+          "CRG:SWEEP_REJECTION": 2
+        },
+        "RECENT": {
+          "RECLAIM_WAIT_LEVEL:SWEEP_REJECTION": 63,
+          "RECLAIM_WAIT_FVG:SWEEP_REJECTION": 6,
+          "CONSUL_GATE1_REGIME:SWEEP_REJECTION": 4,
+          "LOT_FLOOR:SWEEP_REJECTION": 3,
+          "RECLAIM_WAIT_RETURN:SWEEP_REJECTION": 3
+        }
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 22,
+            "pnl": -135.13,
+            "ending_balance": 864.87,
+            "gross_pnl": -114.13,
+            "win_rate_pct": 36.36363636363637,
+            "profit_factor": 0.6648977061376318,
+            "sum_net_r": -4.928589060555293,
+            "max_closed_balance_drawdown": 159.73,
+            "max_closed_balance_drawdown_pct": 15.58949834081592,
+            "cost_overlay_fixed_trades": {
+              "0.17": -124.33,
+              "0.35": -135.13,
+              "0.75": -159.13
+            }
+          },
+          {
+            "trades": 14,
+            "pnl": -42.16,
+            "ending_balance": 957.84,
+            "gross_pnl": -28.51,
+            "win_rate_pct": 42.857142857142854,
+            "profit_factor": 0.7881832797427653,
+            "sum_net_r": -1.0218408004738193,
+            "max_closed_balance_drawdown": 113.89,
+            "max_closed_balance_drawdown_pct": 10.992288314721693,
+            "cost_overlay_fixed_trades": {
+              "0.17": -35.14,
+              "0.35": -42.16,
+              "0.75": -57.76
+            }
+          },
+          {
+            "trades": 14,
+            "pnl": 57.35,
+            "ending_balance": 1057.35,
+            "gross_pnl": 68.55,
+            "win_rate_pct": 50.0,
+            "profit_factor": 1.3249291784702548,
+            "sum_net_r": 2.6514224699844164,
+            "max_closed_balance_drawdown": 143.22,
+            "max_closed_balance_drawdown_pct": 12.43034942456906,
+            "cost_overlay_fixed_trades": {
+              "0.17": 63.11,
+              "0.35": 57.35,
+              "0.75": 44.55
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 46,
+            "pnl": 413.06,
+            "ending_balance": 1413.06,
+            "gross_pnl": 463.81,
+            "win_rate_pct": 52.17391304347826,
+            "profit_factor": 1.7688556324919962,
+            "sum_net_r": 11.165080976210247,
+            "max_closed_balance_drawdown": 177.23,
+            "max_closed_balance_drawdown_pct": 17.723000000000013,
+            "cost_overlay_fixed_trades": {
+              "0.17": 439.16,
+              "0.35": 413.06,
+              "0.75": 355.06
+            }
+          },
+          {
+            "trades": 13,
+            "pnl": -23.52,
+            "ending_balance": 976.48,
+            "gross_pnl": -4.27,
+            "win_rate_pct": 38.46153846153846,
+            "profit_factor": 0.9220779220779219,
+            "sum_net_r": -0.6185726929281478,
+            "max_closed_balance_drawdown": 110.94,
+            "max_closed_balance_drawdown_pct": 11.094000000000005,
+            "cost_overlay_fixed_trades": {
+              "0.17": -13.62,
+              "0.35": -23.52,
+              "0.75": -45.52
+            }
+          },
+          {
+            "trades": 19,
+            "pnl": 26.22,
+            "ending_balance": 1026.22,
+            "gross_pnl": 51.77,
+            "win_rate_pct": 52.63157894736842,
+            "profit_factor": 1.065630397236615,
+            "sum_net_r": 1.264339438996184,
+            "max_closed_balance_drawdown": 145.89,
+            "max_closed_balance_drawdown_pct": 12.84865031485315,
+            "cost_overlay_fixed_trades": {
+              "0.17": 39.36,
+              "0.35": 26.22,
+              "0.75": -2.98
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 9,
+            "pnl": 232.5,
+            "ending_balance": 1232.5,
+            "gross_pnl": 242.3,
+            "win_rate_pct": 77.77777777777777,
+            "profit_factor": 6.122273628552544,
+            "sum_net_r": 6.200439907777729,
+            "max_closed_balance_drawdown": 40.05,
+            "max_closed_balance_drawdown_pct": 3.147224077639382,
+            "cost_overlay_fixed_trades": {
+              "0.17": 237.54,
+              "0.35": 232.5,
+              "0.75": 221.3
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    },
+    "BOS_RETEST": {
+      "pooled": {
+        "trades": 1,
+        "pnl": -31.7,
+        "gross_pnl": -30.3,
+        "win_rate_pct": 0.0,
+        "profit_factor": 0.0,
+        "sum_net_r": -1.0542068506817426,
+        "cost_overlay_fixed_trades": {
+          "0.17": -30.98,
+          "0.35": -31.7,
+          "0.75": -33.3
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 1,
+          "pnl": -31.7,
+          "ending_balance": 968.3,
+          "gross_pnl": -30.3,
+          "win_rate_pct": 0.0,
+          "profit_factor": 0.0,
+          "sum_net_r": -1.0542068506817426,
+          "max_closed_balance_drawdown": 31.7,
+          "max_closed_balance_drawdown_pct": 3.1700000000000044,
+          "cost_overlay_fixed_trades": {
+            "0.17": -30.98,
+            "0.35": -31.7,
+            "0.75": -33.3
+          }
+        },
+        "W2": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        },
+        "RECENT": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "BOS_RETEST": 1825
+        },
+        "W2": {
+          "BOS_RETEST": 1854
+        },
+        "RECENT": {
+          "BOS_RETEST": 108
+        }
+      },
+      "gate_rejections": {
+        "W1": {
+          "RECLAIM_WAIT_LEVEL:BOS_RETEST": 932,
+          "CONSUL_GATE1_REGIME:BOS_RETEST": 275,
+          "RECLAIM_INVALID_GEOMETRY:BOS_RETEST": 179,
+          "STB/opposes_short_term:BOS_RETEST": 144,
+          "STB/neutral_needs_direction:BOS_RETEST": 142,
+          "RECLAIM_WAIT_DISPLACEMENT:BOS_RETEST": 62,
+          "RECLAIM_WAIT_FVG:BOS_RETEST": 36,
+          "RECLAIM_RETURN_STALE:BOS_RETEST": 22,
+          "STB/dont_chase:BOS_RETEST": 12,
+          "RECLAIM_WAIT_RETURN:BOS_RETEST": 10,
+          "RECLAIM_FVG_INVALIDATED:BOS_RETEST": 7,
+          "RECLAIM_RETURN_UNCONFIRMED:BOS_RETEST": 2,
+          "CONSUL_GATE2_DISPLACEMENT:BOS_RETEST": 1
+        },
+        "W2": {
+          "RECLAIM_WAIT_LEVEL:BOS_RETEST": 989,
+          "CONSUL_GATE1_REGIME:BOS_RETEST": 256,
+          "RECLAIM_INVALID_GEOMETRY:BOS_RETEST": 225,
+          "STB/opposes_short_term:BOS_RETEST": 127,
+          "STB/neutral_needs_direction:BOS_RETEST": 117,
+          "RECLAIM_WAIT_DISPLACEMENT:BOS_RETEST": 41,
+          "RECLAIM_WAIT_FVG:BOS_RETEST": 30,
+          "RECLAIM_RETURN_STALE:BOS_RETEST": 22,
+          "RECLAIM_FVG_INVALIDATED:BOS_RETEST": 15,
+          "RECLAIM_WAIT_RETURN:BOS_RETEST": 13,
+          "STB/dont_chase:BOS_RETEST": 6,
+          "RECLAIM_FVG_HISTORY_MISSING:BOS_RETEST": 6,
+          "RECLAIM_RETURN_UNCONFIRMED:BOS_RETEST": 4,
+          "RECLAIM_FVG_EXPIRED:BOS_RETEST": 3
+        },
+        "RECENT": {
+          "RECLAIM_WAIT_LEVEL:BOS_RETEST": 39,
+          "CONSUL_GATE1_REGIME:BOS_RETEST": 18,
+          "STB/neutral_needs_direction:BOS_RETEST": 17,
+          "RECLAIM_INVALID_GEOMETRY:BOS_RETEST": 14,
+          "STB/opposes_short_term:BOS_RETEST": 13,
+          "RECLAIM_WAIT_FVG:BOS_RETEST": 6,
+          "RECLAIM_FVG_INVALIDATED:BOS_RETEST": 1
+        }
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 1,
+            "pnl": -31.7,
+            "ending_balance": 968.3,
+            "gross_pnl": -30.3,
+            "win_rate_pct": 0.0,
+            "profit_factor": 0.0,
+            "sum_net_r": -1.0542068506817426,
+            "max_closed_balance_drawdown": 31.7,
+            "max_closed_balance_drawdown_pct": 3.1700000000000044,
+            "cost_overlay_fixed_trades": {
+              "0.17": -30.98,
+              "0.35": -31.7,
+              "0.75": -33.3
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    },
+    "JUDAS": {
+      "pooled": {
+        "trades": 18,
+        "pnl": 292.58,
+        "gross_pnl": 304.83,
+        "win_rate_pct": 66.66666666666667,
+        "profit_factor": 2.580232244126384,
+        "sum_net_r": 8.553584483148072,
+        "cost_overlay_fixed_trades": {
+          "0.17": 298.88,
+          "0.35": 292.58,
+          "0.75": 278.58
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 4,
+          "pnl": 77.18,
+          "ending_balance": 1077.18,
+          "gross_pnl": 79.63,
+          "win_rate_pct": 75.0,
+          "profit_factor": 3.7156931738212524,
+          "sum_net_r": 2.020764589813238,
+          "max_closed_balance_drawdown": 28.42,
+          "max_closed_balance_drawdown_pct": 2.827129299882613,
+          "cost_overlay_fixed_trades": {
+            "0.17": 78.44,
+            "0.35": 77.18,
+            "0.75": 74.38
+          }
+        },
+        "W2": {
+          "trades": 14,
+          "pnl": 215.4,
+          "ending_balance": 1215.4,
+          "gross_pnl": 225.2,
+          "win_rate_pct": 64.28571428571429,
+          "profit_factor": 2.3743380335609006,
+          "sum_net_r": 6.5328198933348345,
+          "max_closed_balance_drawdown": 93.31,
+          "max_closed_balance_drawdown_pct": 7.8051024675868,
+          "cost_overlay_fixed_trades": {
+            "0.17": 220.44,
+            "0.35": 215.4,
+            "0.75": 204.2
+          }
+        },
+        "RECENT": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "JUDAS": 919
+        },
+        "W2": {
+          "JUDAS": 909
+        },
+        "RECENT": {
+          "JUDAS": 39
+        }
+      },
+      "gate_rejections": {
+        "W1": {
+          "RECLAIM_WAIT_LEVEL:JUDAS": 550,
+          "RECLAIM_WAIT_DISPLACEMENT:JUDAS": 109,
+          "RECLAIM_WAIT_RETURN:JUDAS": 61,
+          "LOT_FLOOR:JUDAS": 55,
+          "RECLAIM_RETURN_STALE:JUDAS": 35,
+          "RECLAIM_WAIT_FVG:JUDAS": 34,
+          "STB/range_guard:JUDAS": 21,
+          "RECLAIM_FVG_EXPIRED:JUDAS": 18,
+          "CONSUL_GATE1_REGIME:JUDAS": 16,
+          "STEP3:JUDAS": 13,
+          "RECLAIM_INVALID_GEOMETRY:JUDAS": 1,
+          "RECLAIM_RETURN_UNCONFIRMED:JUDAS": 1,
+          "RECLAIM_FVG_INVALIDATED:JUDAS": 1
+        },
+        "W2": {
+          "RECLAIM_WAIT_LEVEL:JUDAS": 549,
+          "RECLAIM_WAIT_DISPLACEMENT:JUDAS": 127,
+          "CONSUL_GATE1_REGIME:JUDAS": 48,
+          "RECLAIM_WAIT_FVG:JUDAS": 39,
+          "LOT_FLOOR:JUDAS": 38,
+          "RECLAIM_WAIT_RETURN:JUDAS": 37,
+          "RECLAIM_RETURN_STALE:JUDAS": 27,
+          "RECLAIM_FVG_EXPIRED:JUDAS": 15,
+          "STB/range_guard:JUDAS": 6,
+          "RECLAIM_RETURN_UNCONFIRMED:JUDAS": 5,
+          "RECLAIM_INVALID_GEOMETRY:JUDAS": 3,
+          "RECLAIM_FVG_INVALIDATED:JUDAS": 1
+        },
+        "RECENT": {
+          "RECLAIM_WAIT_LEVEL:JUDAS": 35,
+          "STB/opposes_short_term:JUDAS": 3,
+          "RECLAIM_WAIT_FVG:JUDAS": 1
+        }
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 2,
+            "pnl": -23.16,
+            "ending_balance": 976.84,
+            "gross_pnl": -21.76,
+            "win_rate_pct": 50.0,
+            "profit_factor": 0.18508092892329345,
+            "sum_net_r": -0.8410032324679874,
+            "max_closed_balance_drawdown": 28.42,
+            "max_closed_balance_drawdown_pct": 2.827129299882613,
+            "cost_overlay_fixed_trades": {
+              "0.17": -22.44,
+              "0.35": -23.16,
+              "0.75": -24.76
+            }
+          },
+          {
+            "trades": 1,
+            "pnl": 24.1,
+            "ending_balance": 1024.1,
+            "gross_pnl": 24.45,
+            "win_rate_pct": 100.0,
+            "profit_factor": null,
+            "sum_net_r": 0.8876611418047883,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 24.28,
+              "0.35": 24.1,
+              "0.75": 23.7
+            }
+          },
+          {
+            "trades": 1,
+            "pnl": 76.24,
+            "ending_balance": 1076.24,
+            "gross_pnl": 76.94,
+            "win_rate_pct": 100.0,
+            "profit_factor": null,
+            "sum_net_r": 1.9741066804764371,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 76.6,
+              "0.35": 76.24,
+              "0.75": 75.44
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 8,
+            "pnl": 156.36,
+            "ending_balance": 1156.36,
+            "gross_pnl": 162.31,
+            "win_rate_pct": 75.0,
+            "profit_factor": 3.0715421303656596,
+            "sum_net_r": 4.9628200123788595,
+            "max_closed_balance_drawdown": 39.14,
+            "max_closed_balance_drawdown_pct": 3.634000000000003,
+            "cost_overlay_fixed_trades": {
+              "0.17": 159.42,
+              "0.35": 156.36,
+              "0.75": 149.56
+            }
+          },
+          {
+            "trades": 2,
+            "pnl": 15.96,
+            "ending_balance": 1015.96,
+            "gross_pnl": 17.36,
+            "win_rate_pct": 50.0,
+            "profit_factor": 2.435251798561151,
+            "sum_net_r": 0.35718305422731567,
+            "max_closed_balance_drawdown": 11.12,
+            "max_closed_balance_drawdown_pct": 1.1120000000000005,
+            "cost_overlay_fixed_trades": {
+              "0.17": 16.68,
+              "0.35": 15.96,
+              "0.75": 14.36
+            }
+          },
+          {
+            "trades": 4,
+            "pnl": 43.08,
+            "ending_balance": 1043.08,
+            "gross_pnl": 45.53,
+            "win_rate_pct": 50.0,
+            "profit_factor": 1.6142877513189793,
+            "sum_net_r": 1.2128168267286594,
+            "max_closed_balance_drawdown": 70.13,
+            "max_closed_balance_drawdown_pct": 7.013,
+            "cost_overlay_fixed_trades": {
+              "0.17": 44.34,
+              "0.35": 43.08,
+              "0.75": 40.28
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    },
+    "VP_LIQUIDITY_REACTION": {
+      "pooled": {
+        "trades": 69,
+        "pnl": -95.62,
+        "gross_pnl": -27.37,
+        "win_rate_pct": 44.927536231884055,
+        "profit_factor": 0.8998743455497382,
+        "sum_net_r": -3.482129677015525,
+        "cost_overlay_fixed_trades": {
+          "0.17": -60.52,
+          "0.35": -95.62,
+          "0.75": -173.62
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 35,
+          "pnl": -186.34,
+          "ending_balance": 813.66,
+          "gross_pnl": -153.09,
+          "win_rate_pct": 42.857142857142854,
+          "profit_factor": 0.6747311827956989,
+          "sum_net_r": -6.410962241252436,
+          "max_closed_balance_drawdown": 256.21,
+          "max_closed_balance_drawdown_pct": 23.947769355155327,
+          "cost_overlay_fixed_trades": {
+            "0.17": -169.24,
+            "0.35": -186.34,
+            "0.75": -224.34
+          }
+        },
+        "W2": {
+          "trades": 34,
+          "pnl": 90.72,
+          "ending_balance": 1090.72,
+          "gross_pnl": 125.72,
+          "win_rate_pct": 47.05882352941177,
+          "profit_factor": 1.237412331204857,
+          "sum_net_r": 2.9288325642369113,
+          "max_closed_balance_drawdown": 172.28,
+          "max_closed_balance_drawdown_pct": 16.20376031075706,
+          "cost_overlay_fixed_trades": {
+            "0.17": 108.72,
+            "0.35": 90.72,
+            "0.75": 50.72
+          }
+        },
+        "RECENT": {
+          "trades": 2,
+          "pnl": -47.64,
+          "ending_balance": 952.36,
+          "gross_pnl": -45.89,
+          "win_rate_pct": 0.0,
+          "profit_factor": 0.0,
+          "sum_net_r": -1.7826806157099575,
+          "max_closed_balance_drawdown": 47.64,
+          "max_closed_balance_drawdown_pct": 4.7639999999999985,
+          "cost_overlay_fixed_trades": {
+            "0.17": -46.74,
+            "0.35": -47.64,
+            "0.75": -49.64
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "VP_LIQUIDITY_REACTION": 1631
+        },
+        "W2": {
+          "VP_LIQUIDITY_REACTION": 1437
+        },
+        "RECENT": {
+          "VP_LIQUIDITY_REACTION": 110
+        }
+      },
+      "gate_rejections": {
+        "W1": {
+          "RECLAIM_WAIT_LEVEL:VP_LIQUIDITY_REACTION": 1123,
+          "RECLAIM_WAIT_DISPLACEMENT:VP_LIQUIDITY_REACTION": 142,
+          "RECLAIM_WAIT_FVG:VP_LIQUIDITY_REACTION": 138,
+          "RECLAIM_RETURN_STALE:VP_LIQUIDITY_REACTION": 75,
+          "RECLAIM_WAIT_RETURN:VP_LIQUIDITY_REACTION": 45,
+          "STEP3:VP_LIQUIDITY_REACTION": 40,
+          "LOT_FLOOR:VP_LIQUIDITY_REACTION": 13,
+          "RECLAIM_FVG_INVALIDATED:VP_LIQUIDITY_REACTION": 10,
+          "RECLAIM_RETURN_UNCONFIRMED:VP_LIQUIDITY_REACTION": 7,
+          "RECLAIM_INVALID_GEOMETRY:VP_LIQUIDITY_REACTION": 3
+        },
+        "W2": {
+          "RECLAIM_WAIT_LEVEL:VP_LIQUIDITY_REACTION": 1134,
+          "RECLAIM_WAIT_DISPLACEMENT:VP_LIQUIDITY_REACTION": 136,
+          "RECLAIM_WAIT_FVG:VP_LIQUIDITY_REACTION": 50,
+          "RECLAIM_WAIT_RETURN:VP_LIQUIDITY_REACTION": 39,
+          "LOT_FLOOR:VP_LIQUIDITY_REACTION": 21,
+          "RECLAIM_FVG_INVALIDATED:VP_LIQUIDITY_REACTION": 9,
+          "CRG:VP_LIQUIDITY_REACTION": 6,
+          "CONSUL_GATE1_REGIME:VP_LIQUIDITY_REACTION": 4,
+          "RECLAIM_RETURN_STALE:VP_LIQUIDITY_REACTION": 2,
+          "RECLAIM_RETURN_UNCONFIRMED:VP_LIQUIDITY_REACTION": 1,
+          "RECLAIM_INVALID_GEOMETRY:VP_LIQUIDITY_REACTION": 1
+        },
+        "RECENT": {
+          "RECLAIM_WAIT_LEVEL:VP_LIQUIDITY_REACTION": 71,
+          "RECLAIM_WAIT_DISPLACEMENT:VP_LIQUIDITY_REACTION": 18,
+          "CONSUL_GATE1_REGIME:VP_LIQUIDITY_REACTION": 17,
+          "RECLAIM_WAIT_FVG:VP_LIQUIDITY_REACTION": 1,
+          "LOT_FLOOR:VP_LIQUIDITY_REACTION": 1
+        }
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 15,
+            "pnl": -28.55,
+            "ending_balance": 971.45,
+            "gross_pnl": -14.55,
+            "win_rate_pct": 46.666666666666664,
+            "profit_factor": 0.8763962247813665,
+            "sum_net_r": -0.9523224263300633,
+            "max_closed_balance_drawdown": 98.42,
+            "max_closed_balance_drawdown_pct": 9.19924850682794,
+            "cost_overlay_fixed_trades": {
+              "0.17": -21.35,
+              "0.35": -28.55,
+              "0.75": -44.55
+            }
+          },
+          {
+            "trades": 10,
+            "pnl": 43.95,
+            "ending_balance": 1043.95,
+            "gross_pnl": 55.5,
+            "win_rate_pct": 60.0,
+            "profit_factor": 1.4053306280549662,
+            "sum_net_r": 1.2503603228115439,
+            "max_closed_balance_drawdown": 40.83,
+            "max_closed_balance_drawdown_pct": 3.7897140311308024,
+            "cost_overlay_fixed_trades": {
+              "0.17": 49.89,
+              "0.35": 43.95,
+              "0.75": 30.75
+            }
+          },
+          {
+            "trades": 10,
+            "pnl": -201.74,
+            "ending_balance": 798.26,
+            "gross_pnl": -194.04,
+            "win_rate_pct": 20.0,
+            "profit_factor": 0.1359061121343213,
+            "sum_net_r": -6.709000137733917,
+            "max_closed_balance_drawdown": 201.74,
+            "max_closed_balance_drawdown_pct": 20.174,
+            "cost_overlay_fixed_trades": {
+              "0.17": -197.78,
+              "0.35": -201.74,
+              "0.75": -210.54
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 22,
+            "pnl": 13.42,
+            "ending_balance": 1013.42,
+            "gross_pnl": 35.47,
+            "win_rate_pct": 45.45454545454545,
+            "profit_factor": 1.054603897953371,
+            "sum_net_r": 0.5437315815069944,
+            "max_closed_balance_drawdown": 172.28,
+            "max_closed_balance_drawdown_pct": 16.20376031075706,
+            "cost_overlay_fixed_trades": {
+              "0.17": 24.76,
+              "0.35": 13.42,
+              "0.75": -11.78
+            }
+          },
+          {
+            "trades": 3,
+            "pnl": 116.52,
+            "ending_balance": 1116.52,
+            "gross_pnl": 119.32,
+            "win_rate_pct": 100.0,
+            "profit_factor": null,
+            "sum_net_r": 3.946933804464395,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 117.96,
+              "0.35": 116.52,
+              "0.75": 113.32
+            }
+          },
+          {
+            "trades": 9,
+            "pnl": -39.22,
+            "ending_balance": 960.78,
+            "gross_pnl": -29.07,
+            "win_rate_pct": 33.333333333333336,
+            "profit_factor": 0.7123579024569123,
+            "sum_net_r": -1.5618328217344781,
+            "max_closed_balance_drawdown": 71.4,
+            "max_closed_balance_drawdown_pct": 6.917398128233446,
+            "cost_overlay_fixed_trades": {
+              "0.17": -34.0,
+              "0.35": -39.22,
+              "0.75": -50.82
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 2,
+            "pnl": -47.64,
+            "ending_balance": 952.36,
+            "gross_pnl": -45.89,
+            "win_rate_pct": 0.0,
+            "profit_factor": 0.0,
+            "sum_net_r": -1.7826806157099575,
+            "max_closed_balance_drawdown": 47.64,
+            "max_closed_balance_drawdown_pct": 4.7639999999999985,
+            "cost_overlay_fixed_trades": {
+              "0.17": -46.74,
+              "0.35": -47.64,
+              "0.75": -49.64
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    },
+    "VALUE_AREA_FADE": {
+      "pooled": {
+        "trades": 0,
+        "pnl": 0,
+        "gross_pnl": 0,
+        "win_rate_pct": null,
+        "profit_factor": null,
+        "sum_net_r": 0,
+        "cost_overlay_fixed_trades": {
+          "0.17": 0,
+          "0.35": 0,
+          "0.75": 0
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        },
+        "W2": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        },
+        "RECENT": {
+          "trades": 0,
+          "pnl": 0,
+          "ending_balance": 1000.0,
+          "gross_pnl": 0,
+          "win_rate_pct": null,
+          "profit_factor": null,
+          "sum_net_r": 0,
+          "max_closed_balance_drawdown": 0.0,
+          "max_closed_balance_drawdown_pct": 0.0,
+          "cost_overlay_fixed_trades": {
+            "0.17": 0,
+            "0.35": 0,
+            "0.75": 0
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "VALUE_AREA_FADE": 6
+        },
+        "W2": {
+          "VALUE_AREA_FADE": 6
+        },
+        "RECENT": {}
+      },
+      "gate_rejections": {
+        "W1": {
+          "RECLAIM_WAIT_LEVEL:VALUE_AREA_FADE": 6
+        },
+        "W2": {
+          "RECLAIM_WAIT_LEVEL:VALUE_AREA_FADE": 6
+        },
+        "RECENT": {}
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    },
+    "BASELINE": {
+      "pooled": {
+        "trades": 140,
+        "pnl": 259.95,
+        "gross_pnl": 414.65,
+        "win_rate_pct": 46.42857142857143,
+        "profit_factor": 1.1155040723016836,
+        "sum_net_r": 10.865691040667462,
+        "cost_overlay_fixed_trades": {
+          "0.17": 339.51,
+          "0.35": 259.95,
+          "0.75": 83.15
+        }
+      },
+      "windows": {
+        "W1": {
+          "trades": 59,
+          "pnl": 10.21,
+          "ending_balance": 1010.21,
+          "gross_pnl": 66.21,
+          "win_rate_pct": 45.76271186440678,
+          "profit_factor": 1.0109480050182824,
+          "sum_net_r": 2.6149092275816406,
+          "max_closed_balance_drawdown": 219.66,
+          "max_closed_balance_drawdown_pct": 20.0775094601759,
+          "cost_overlay_fixed_trades": {
+            "0.17": 39.01,
+            "0.35": 10.21,
+            "0.75": -53.79
+          }
+        },
+        "W2": {
+          "trades": 81,
+          "pnl": 249.74,
+          "ending_balance": 1249.74,
+          "gross_pnl": 348.44,
+          "win_rate_pct": 46.91358024691358,
+          "profit_factor": 1.1894869421387275,
+          "sum_net_r": 8.25078181308582,
+          "max_closed_balance_drawdown": 230.46,
+          "max_closed_balance_drawdown_pct": 17.723000000000013,
+          "cost_overlay_fixed_trades": {
+            "0.17": 300.5,
+            "0.35": 249.74,
+            "0.75": 136.94
+          }
+        },
+        "RECENT": {
+          "trades": 9,
+          "pnl": 232.5,
+          "ending_balance": 1232.5,
+          "gross_pnl": 242.3,
+          "win_rate_pct": 77.77777777777777,
+          "profit_factor": 6.122273628552544,
+          "sum_net_r": 6.200439907777729,
+          "max_closed_balance_drawdown": 40.05,
+          "max_closed_balance_drawdown_pct": 3.147224077639382,
+          "cost_overlay_fixed_trades": {
+            "0.17": 237.54,
+            "0.35": 232.5,
+            "0.75": 221.3
+          }
+        }
+      },
+      "detections": {
+        "W1": {
+          "SWEEP_REJECTION": 2010,
+          "BOS_RETEST": 55,
+          "JUDAS": 44,
+          "FVG_FILL": 9,
+          "HTF_CRT_SWEEP": 1
+        },
+        "W2": {
+          "SWEEP_REJECTION": 1951,
+          "JUDAS": 73,
+          "BOS_RETEST": 27,
+          "FVG_FILL": 8
+        },
+        "RECENT": {
+          "SWEEP_REJECTION": 88,
+          "BOS_RETEST": 3
+        }
+      },
+      "gate_rejections": {
+        "W1": {
+          "RECLAIM_WAIT_LEVEL:SWEEP_REJECTION": 1418,
+          "RECLAIM_WAIT_DISPLACEMENT:SWEEP_REJECTION": 155,
+          "RECLAIM_WAIT_FVG:SWEEP_REJECTION": 84,
+          "STEP3:SWEEP_REJECTION": 73,
+          "STB/range_guard:SWEEP_REJECTION": 47,
+          "LOT_FLOOR:SWEEP_REJECTION": 39,
+          "RECLAIM_INVALID_GEOMETRY:SWEEP_REJECTION": 38,
+          "CONSUL_GATE1_REGIME:SWEEP_REJECTION": 36,
+          "RECLAIM_WAIT_RETURN:SWEEP_REJECTION": 34,
+          "CONSUL_GATE1_REGIME:BOS_RETEST": 29,
+          "RECLAIM_RETURN_STALE:SWEEP_REJECTION": 19,
+          "RECLAIM_WAIT_DISPLACEMENT:JUDAS": 12,
+          "RECLAIM_WAIT_LEVEL:BOS_RETEST": 12,
+          "STEP3:JUDAS": 10,
+          "RECLAIM_WAIT_LEVEL:JUDAS": 7,
+          "RECLAIM_INVALID_GEOMETRY:BOS_RETEST": 5,
+          "STB/dont_chase:SWEEP_REJECTION": 5,
+          "STB/dont_chase:BOS_RETEST": 5,
+          "RECLAIM_FVG_INVALIDATED:SWEEP_REJECTION": 5,
+          "CONSUL_GATE1_REGIME:JUDAS": 4,
+          "LOT_FLOOR:JUDAS": 4,
+          "RECLAIM_FVG_INVALIDATED:FVG_FILL": 4,
+          "STB/opposes_short_term:BOS_RETEST": 3,
+          "RECLAIM_RETURN_STALE:JUDAS": 3,
+          "RECLAIM_WAIT_RETURN:JUDAS": 3,
+          "RECLAIM_RETURN_UNCONFIRMED:SWEEP_REJECTION": 2,
+          "STEP3:HTF_CRT_SWEEP": 1,
+          "STB/opposes_short_term:FVG_FILL": 1,
+          "RECLAIM_RETURN_STALE:FVG_FILL": 1,
+          "RECLAIM_RETURN_UNCONFIRMED:FVG_FILL": 1
+        },
+        "W2": {
+          "RECLAIM_WAIT_LEVEL:SWEEP_REJECTION": 1371,
+          "RECLAIM_WAIT_DISPLACEMENT:SWEEP_REJECTION": 169,
+          "RECLAIM_WAIT_FVG:SWEEP_REJECTION": 93,
+          "CONSUL_GATE1_REGIME:SWEEP_REJECTION": 64,
+          "RECLAIM_WAIT_RETURN:SWEEP_REJECTION": 47,
+          "RECLAIM_INVALID_GEOMETRY:SWEEP_REJECTION": 33,
+          "RECLAIM_WAIT_LEVEL:JUDAS": 30,
+          "STB/range_guard:SWEEP_REJECTION": 24,
+          "RECLAIM_WAIT_LEVEL:BOS_RETEST": 18,
+          "STB/dont_chase:SWEEP_REJECTION": 17,
+          "CONSUL_GATE1_REGIME:JUDAS": 17,
+          "RECLAIM_RETURN_STALE:SWEEP_REJECTION": 15,
+          "RECLAIM_FVG_INVALIDATED:SWEEP_REJECTION": 15,
+          "LOT_FLOOR:SWEEP_REJECTION": 12,
+          "RECLAIM_WAIT_DISPLACEMENT:JUDAS": 9,
+          "LOT_FLOOR:JUDAS": 8,
+          "RECLAIM_RETURN_UNCONFIRMED:SWEEP_REJECTION": 6,
+          "RECLAIM_RETURN_STALE:JUDAS": 6,
+          "STEP3:SWEEP_REJECTION": 6,
+          "CONSUL_GATE1_REGIME:BOS_RETEST": 4,
+          "RECLAIM_RETURN_STALE:BOS_RETEST": 3,
+          "STB/opposes_short_term:FVG_FILL": 3,
+          "RECLAIM_WAIT_RETURN:JUDAS": 3,
+          "RECLAIM_INVALID_GEOMETRY:BOS_RETEST": 2,
+          "CRG:SWEEP_REJECTION": 2,
+          "STB/range_guard:FVG_FILL": 1
+        },
+        "RECENT": {
+          "RECLAIM_WAIT_LEVEL:SWEEP_REJECTION": 63,
+          "RECLAIM_WAIT_FVG:SWEEP_REJECTION": 6,
+          "CONSUL_GATE1_REGIME:SWEEP_REJECTION": 4,
+          "LOT_FLOOR:SWEEP_REJECTION": 3,
+          "RECLAIM_WAIT_FVG:BOS_RETEST": 3,
+          "RECLAIM_WAIT_RETURN:SWEEP_REJECTION": 3
+        }
+      },
+      "folds": {
+        "W1": [
+          {
+            "trades": 25,
+            "pnl": -93.02,
+            "ending_balance": 906.98,
+            "gross_pnl": -67.82,
+            "win_rate_pct": 40.0,
+            "profit_factor": 0.806980411686587,
+            "sum_net_r": -1.6723708694681787,
+            "max_closed_balance_drawdown": 187.08,
+            "max_closed_balance_drawdown_pct": 17.099610624645848,
+            "cost_overlay_fixed_trades": {
+              "0.17": -80.06,
+              "0.35": -93.02,
+              "0.75": -121.82
+            }
+          },
+          {
+            "trades": 17,
+            "pnl": 79.38,
+            "ending_balance": 1079.38,
+            "gross_pnl": 95.48,
+            "win_rate_pct": 58.8235294117647,
+            "profit_factor": 1.3948860809869663,
+            "sum_net_r": 3.8469644724817584,
+            "max_closed_balance_drawdown": 68.67,
+            "max_closed_balance_drawdown_pct": 6.627802604020883,
+            "cost_overlay_fixed_trades": {
+              "0.17": 87.66,
+              "0.35": 79.38,
+              "0.75": 60.98
+            }
+          },
+          {
+            "trades": 17,
+            "pnl": 23.85,
+            "ending_balance": 1023.85,
+            "gross_pnl": 38.55,
+            "win_rate_pct": 41.1764705882353,
+            "profit_factor": 1.0955337472461446,
+            "sum_net_r": 0.44031562456806134,
+            "max_closed_balance_drawdown": 180.25,
+            "max_closed_balance_drawdown_pct": 15.596473163682921,
+            "cost_overlay_fixed_trades": {
+              "0.17": 31.41,
+              "0.35": 23.85,
+              "0.75": 7.05
+            }
+          }
+        ],
+        "W2": [
+          {
+            "trades": 47,
+            "pnl": 330.97,
+            "ending_balance": 1330.97,
+            "gross_pnl": 382.77,
+            "win_rate_pct": 48.93617021276596,
+            "profit_factor": 1.5799775698314233,
+            "sum_net_r": 9.67971396495878,
+            "max_closed_balance_drawdown": 177.23,
+            "max_closed_balance_drawdown_pct": 17.723000000000013,
+            "cost_overlay_fixed_trades": {
+              "0.17": 357.61,
+              "0.35": 330.97,
+              "0.75": 271.77
+            }
+          },
+          {
+            "trades": 13,
+            "pnl": -31.43,
+            "ending_balance": 968.57,
+            "gross_pnl": -12.88,
+            "win_rate_pct": 38.46153846153846,
+            "profit_factor": 0.8938390866716206,
+            "sum_net_r": -0.6184051365982178,
+            "max_closed_balance_drawdown": 110.94,
+            "max_closed_balance_drawdown_pct": 11.094000000000005,
+            "cost_overlay_fixed_trades": {
+              "0.17": -21.89,
+              "0.35": -31.43,
+              "0.75": -52.63
+            }
+          },
+          {
+            "trades": 21,
+            "pnl": -49.8,
+            "ending_balance": 950.2,
+            "gross_pnl": -21.45,
+            "win_rate_pct": 47.61904761904762,
+            "profit_factor": 0.8896423347959048,
+            "sum_net_r": -0.8105270152747397,
+            "max_closed_balance_drawdown": 230.46,
+            "max_closed_balance_drawdown_pct": 20.516883741219836,
+            "cost_overlay_fixed_trades": {
+              "0.17": -35.22,
+              "0.35": -49.8,
+              "0.75": -82.2
+            }
+          }
+        ],
+        "RECENT": [
+          {
+            "trades": 9,
+            "pnl": 232.5,
+            "ending_balance": 1232.5,
+            "gross_pnl": 242.3,
+            "win_rate_pct": 77.77777777777777,
+            "profit_factor": 6.122273628552544,
+            "sum_net_r": 6.200439907777729,
+            "max_closed_balance_drawdown": 40.05,
+            "max_closed_balance_drawdown_pct": 3.147224077639382,
+            "cost_overlay_fixed_trades": {
+              "0.17": 237.54,
+              "0.35": 232.5,
+              "0.75": 221.3
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          },
+          {
+            "trades": 0,
+            "pnl": 0,
+            "ending_balance": 1000.0,
+            "gross_pnl": 0,
+            "win_rate_pct": null,
+            "profit_factor": null,
+            "sum_net_r": 0,
+            "max_closed_balance_drawdown": 0.0,
+            "max_closed_balance_drawdown_pct": 0.0,
+            "cost_overlay_fixed_trades": {
+              "0.17": 0,
+              "0.35": 0,
+              "0.75": 0
+            }
+          }
+        ]
+      }
+    }
+  },
+  "priority": {
+    "SWEEP_REJECTION": {
+      "W1": {
+        "status": "REPLAYED",
+        "potentially_changed_scans": 8,
+        "arbitration_switches": 8,
+        "pnl": 2.82,
+        "delta": -7.39,
+        "trades": 58,
+        "metrics": {
+          "trades": 58,
+          "pnl": 2.82,
+          "ending_balance": 1002.82,
+          "gross_pnl": 57.42,
+          "win_rate_pct": 44.827586206896555,
+          "profit_factor": 1.0030238368414843,
+          "sum_net_r": 2.3146247903609987,
+          "max_closed_balance_drawdown": 219.66,
+          "max_closed_balance_drawdown_pct": 20.0775094601759,
+          "cost_overlay_fixed_trades": {
+            "0.17": 30.9,
+            "0.35": 2.82,
+            "0.75": -59.58
+          }
+        }
+      },
+      "W2": {
+        "status": "REPLAYED",
+        "potentially_changed_scans": 8,
+        "arbitration_switches": 6,
+        "pnl": 415.76,
+        "delta": 166.02,
+        "trades": 78,
+        "metrics": {
+          "trades": 78,
+          "pnl": 415.76,
+          "ending_balance": 1415.76,
+          "gross_pnl": 511.31,
+          "win_rate_pct": 50.0,
+          "profit_factor": 1.3356720141451166,
+          "sum_net_r": 11.810847722278282,
+          "max_closed_balance_drawdown": 177.23,
+          "max_closed_balance_drawdown_pct": 17.723000000000013,
+          "cost_overlay_fixed_trades": {
+            "0.17": 464.9,
+            "0.35": 415.76,
+            "0.75": 306.56
+          }
+        }
+      }
+    },
+    "JUDAS": {
+      "W1": {
+        "status": "REPLAYED",
+        "potentially_changed_scans": 729,
+        "arbitration_switches": 845,
+        "pnl": -115.91,
+        "delta": -126.12,
+        "trades": 40,
+        "metrics": {
+          "trades": 40,
+          "pnl": -115.91,
+          "ending_balance": 884.09,
+          "gross_pnl": -82.31,
+          "win_rate_pct": 45.0,
+          "profit_factor": 0.813757310881162,
+          "sum_net_r": -1.5532653993152463,
+          "max_closed_balance_drawdown": 203.63,
+          "max_closed_balance_drawdown_pct": 19.59242973838916,
+          "cost_overlay_fixed_trades": {
+            "0.17": -98.63,
+            "0.35": -115.91,
+            "0.75": -154.31
+          }
+        }
+      },
+      "W2": {
+        "status": "REPLAYED",
+        "potentially_changed_scans": 695,
+        "arbitration_switches": 805,
+        "pnl": 436.5,
+        "delta": 186.76,
+        "trades": 65,
+        "metrics": {
+          "trades": 65,
+          "pnl": 436.5,
+          "ending_balance": 1436.5,
+          "gross_pnl": 512.45,
+          "win_rate_pct": 49.23076923076923,
+          "profit_factor": 1.4501717149840663,
+          "sum_net_r": 12.539273318044692,
+          "max_closed_balance_drawdown": 180.23,
+          "max_closed_balance_drawdown_pct": 18.023,
+          "cost_overlay_fixed_trades": {
+            "0.17": 475.56,
+            "0.35": 436.5,
+            "0.75": 349.7
+          }
+        }
+      }
+    }
+  },
+  "validation": {
+    "results_checked": [
+      "RECENT__BASELINE",
+      "RECENT__BOS_RETEST",
+      "RECENT__FVG_FILL",
+      "RECENT__HTF_CRT_SWEEP",
+      "RECENT__JUDAS",
+      "RECENT__SWEEP_REJECTION",
+      "RECENT__VALUE_AREA_FADE",
+      "RECENT__VP_LIQUIDITY_REACTION",
+      "SMOKE__BASELINE",
+      "SMOKE__VP_LIQUIDITY_REACTION",
+      "SMOKE__VP_LIQUIDITY_REACTION_FULLWATCH",
+      "W1__BASELINE",
+      "W1__BOS_RETEST",
+      "W1__FVG_FILL",
+      "W1__HTF_CRT_SWEEP",
+      "W1__JUDAS",
+      "W1__SWEEP_REJECTION",
+      "W1__TOP_JUDAS",
+      "W1__TOP_SWEEP_REJECTION",
+      "W1__VALUE_AREA_FADE",
+      "W1__VP_LIQUIDITY_REACTION",
+      "W2__BASELINE",
+      "W2__BOS_RETEST",
+      "W2__FVG_FILL",
+      "W2__HTF_CRT_SWEEP",
+      "W2__JUDAS",
+      "W2__SWEEP_REJECTION",
+      "W2__TOP_JUDAS",
+      "W2__TOP_SWEEP_REJECTION",
+      "W2__VALUE_AREA_FADE",
+      "W2__VP_LIQUIDITY_REACTION"
+    ],
+    "production_python_changed": [],
+    "vp_watch_parity": {
+      "passed": true,
+      "fields": [
+        "trades",
+        "summary",
+        "rejections",
+        "triggers_detected",
+        "rejections_by_trigger",
+        "equity_curve"
+      ],
+      "trades": 1
+    },
+    "harness_sha256": "76ef08a6e8479647281e40cd3cf280b6c5abe09ad103949a6f1d8e5151deec45"
+  }
+}

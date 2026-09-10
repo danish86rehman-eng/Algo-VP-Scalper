@@ -2,16 +2,19 @@
 SA Session Window Checker
 ==========================
 Determines if SA is allowed to trade based on current UTC time.
-SA is ONLY active during four high-volatility micro-windows per spec.
+SA defines five named micro-windows, but is active by default only during
+Tokyo Open and the London-NY overlap.
 
 Session Windows (UTC):
-    Tokyo Open         : 00:00 – 02:00  (Asia Kill Zone)
-    Pre-London         : 06:30 – 07:00
+    Tokyo Open         : 00:00 – 06:00  (Asia Kill Zone)
+    Pre-London         : 06:00 – 07:00
     London Open        : 07:00 – 08:30  (Primary scalp window)
     London-NY Overlap  : 12:00 – 13:30  (Highest volatility)
     NY Lunch Reversal  : 16:30 – 17:30  (Mean reversion scalps)
 
-Outside these windows → SA goes IDLE automatically.
+Pre-London, London Open, NY Lunch, and all other times → SA goes IDLE by
+default. Disabled named windows remain available through an explicit session
+whitelist for controlled research runs.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -28,13 +31,27 @@ class SessionWindow:
     priority: int       # 1=highest volatility, 4=lowest
 
 
+#SESSION_WINDOWS = [
+#    SessionWindow("LONDON_OPEN",    dtime(7, 0),  dtime(8, 30),  "Primary scalp window 12:00 - 13:30",          1),
+#    SessionWindow("LONDON_NY",      dtime(12, 0), dtime(15, 00), "Highest volatility window 5:00 - 8:00",      1),
+#    SessionWindow("PRE_LONDON",     dtime(6, 30), dtime(7, 0),   "Early liquidity grab 11:30 - 12:00",           2),
+#    SessionWindow("TOKYO_OPEN",     dtime(0, 0),  dtime(6, 0),   "Tokyo Open / Asia Kill Zone 5:00 - 11:00",   2),
+#    SessionWindow("NY_LUNCH_REV",   dtime(16, 30), dtime(17, 30),"Mean reversion scalps 9:30 - 10:30",          3),
+#]
+
 SESSION_WINDOWS = [
-    SessionWindow("LONDON_OPEN",    dtime(7, 0),  dtime(8, 30),  "Primary scalp window",          1),
-    SessionWindow("LONDON_NY",      dtime(12, 0), dtime(13, 30), "Highest volatility window",      1),
-    SessionWindow("PRE_LONDON",     dtime(6, 30), dtime(7, 0),   "Early liquidity grab",           2),
-    SessionWindow("TOKYO_OPEN",     dtime(0, 0),  dtime(2, 0),   "Tokyo Open / Asia Kill Zone",   2),
-    SessionWindow("NY_LUNCH_REV",   dtime(16, 30), dtime(17, 30),"Mean reversion scalps",          3),
-]
+     SessionWindow("LONDON_OPEN", dtime(7, 0), dtime(8, 30), "Primary scalp window", 1),
+     SessionWindow("LONDON_NY", dtime(12, 0), dtime(13, 30), "Highest volatility window", 1),
+     SessionWindow("PRE_LONDON", dtime(6, 0), dtime(7, 0), "Early liquidity grab", 2),
+     SessionWindow("TOKYO_OPEN", dtime(0, 0), dtime(6, 0), "Tokyo Open / Asia Kill Zone", 2),
+     SessionWindow("NY_LUNCH_REV", dtime(16, 30), dtime(17, 30),"Mean reversion scalps", 3), ]
+
+
+# Operator-selected production default (2026-09-05). Keep all five definitions
+# above so a controlled replay can still request an excluded window explicitly.
+# Both live and backtest instantiate this checker, so this one default preserves
+# decision-path parity. --"PRE_LONDON" excluded
+DEFAULT_ENABLED_SESSIONS = ("LONDON_OPEN","LONDON_NY","PRE_LONDON","TOKYO_OPEN", "NY_LUNCH_REV") 
 
 # The `Whole_day` 00:00-23:00 fallback used to live at the end of this list.
 # Because `get_state()` returns the FIRST matching window, it matched every
@@ -128,8 +145,11 @@ class SASessionChecker:
         # folds — the only block with a stable sign. Being able to switch a
         # window off is therefore a gate, and lives identically in the live
         # agent and the backtester (invariant #2).
-        if enabled_sessions is not None:
-            requested = {str(x).strip().upper() for x in enabled_sessions if str(x).strip()}
+        requested_sessions = (DEFAULT_ENABLED_SESSIONS
+                              if enabled_sessions is None else enabled_sessions)
+        if requested_sessions is not None:
+            requested = {str(x).strip().upper() for x in requested_sessions
+                         if str(x).strip()}
             unknown = requested - set(self.ALL_WINDOWS)
             if unknown:
                 raise ValueError(

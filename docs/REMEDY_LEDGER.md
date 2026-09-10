@@ -1229,3 +1229,72 @@ promote from a bucket.
                        tier x HTF agreement) that remains partly unmeasurable —
                        see the `htf_trend` gap recorded in
                        `wiki/synthesis/open-questions.md`.
+
+
+## L-017 — failed-reclaim context and fresh setup after a Guardian reversal exit
+
+**Current status: IMPLEMENTED AND VALIDATED as an operator-directed demo entry restriction; efficacy unverified. See the implementation mandate and outcome below. The original proposal fields are retained as history.**
+
+- **Opened**      : 2026-09-02, operator report of broken 4324 support and M15-chart POC near 4328; broker-reconciled pair 494903819 (+$15.73) then 494906413 (-$27.18), net -$11.45. Full review: `APEX_SUPPORT_RETEST_ENHANCEMENT_RECOMMENDATIONS.md`; evidence: `docs/reviews/2026-09-02-support-retest-evidence/`.
+- **Failure mode**: second entry reuses pre-exit sweep evidence after a bearish Guardian reversal exit. Existing application label is `SIGNAL_FALSE`; the preceding `WIN_TP1` label is wrong about exit type (broker says `TGA_EARLY_CLOSE`).
+- **Remedy**      : candidate R7 in REMEDY_KB.md. A: persist reversal exit/setup identity, require a new closed M15 confirmation and fresh setup after invalidation. B: track support/resistance through break, retest and successful/failed reclaim, with closed M5 confirmation. C: add explicitly anchored intraday VP context to B, then measure incremental value. Symmetric for BUY/SELL. Defaults remain unchanged.
+- **Evidence**    : broker-verified transaction facts plus exact two-case trigger/STB reproduction. Remedy efficacy remains an anecdotal hypothesis; POC 4328 remains operator-reported with anchors/bins UNKNOWN. No Grade A performance experiment was run for this entry.
+- **Hypothesis**  : exit-aware setup invalidation reduces losing same-direction re-entries after reversal exits, beyond a timer alone. A stateful failed-reclaim rule might distinguish continuation from a transient rebound; defined VP context might add information beyond that rule. Test each contribution separately, including lost winners and new downstream trades.
+- **Arm**         : A/B/C are design drafts, NOT runnable or fully preregistered arms. Record exact buffers, freshness, profile definition, evaluation dates, costs, config hash and commands before testing. A and its baseline must use the existing `--tga-exits` path; L-003 already implemented Guardian replay on 28 August, but it is off by default. Existing sessions, costs, cooldown, risk and position limits must match.
+- **Result**      : diagnostic reconstruction only. Both historical signal entries/stops/targets and MEDIUM/BULLISH/BEARISH bias decisions matched. The second candidate's M15 confirmation closed at 08:15, before the first broker exit at 08:15:52; the proposed new-bar predicate rejects it. Holding every other trade fixed would avoid $27.18, but that is NOT a portfolio-performance result. At a 45% sweep-wick floor, the first winner (21.39%) fails and the second loser (48.61%) passes.
+- **Verdict**     : **PROPOSED. No production change or promotion.**
+- **Notes**       : do not re-enable L-005's H4 no-POC gate or claim a short at 4328 was proven profitable. Pre-register before running performance arms and respect the vault's current seven-part evidence gate: untouched OOS, prespecified power, pooled confidence intervals, null comparison, regime stability, measured costs and variant accounting. Same-sign folds alone cannot promote. This incident is development data. Correct exit labels/fill/cost snapshots before using incident classifications for outcome research.
+
+
+### L-017 screenshot addendum — 2026-09-02
+
+Operator supplied the chart and clarified that a long must wait for reclaim of prior broken support. The chart marks **4324.76**; the first actual buy 4324.048 was below it. The second signal's completed M15 close 4325.452 was above it, and the last completed M5 low 4324.770 was 0.010 above it. Therefore neither a bare price-above-level check nor an unbuffered M5 hold necessarily blocks the second trade. Require an explicitly defined, separately completed acceptance/retest and reset old long permission after a subsequent bearish invalidation. The Guardian exit follows the last M15 confirmation, so no fresh post-invalidation M15 evidence existed for the second buy. Profile settings and entry-time POC remain unverified by a 12:32 UTC screenshot. The wider reclaim rule may remove the first winner too; its benefit cannot be equated with the $27.18 single-trade exclusion counterfactual. Full addendum and original image are in the vault review; production settings unchanged.
+
+
+### L-017 implementation mandate — 2026-09-02
+
+The operator explicitly requested correction after the repeated loss: no long after broken support until displacement reclaims it and price subsequently returns to the resulting FVG; symmetric after broken resistance. This authorizes implementation and the corrected demo entry contract. It is not a claim of proven profitability or authorization to promote to real-money execution.
+
+Frozen implementation definition, before validation: confirmed M15 swing pivots with 3 bars each side; confirmation must precede the break. Use the existing 150-bar decision window. Consider broken levels inside the candidate's original stop-to-TP1 corridor, prioritizing the nearest unresolved obstacle ahead of entry, otherwise the nearest broken level behind it. Freeze a 0.1 x preceding ATR(14) zone buffer at the break. Reclaim body >=0.8 x preceding ATR(14), >=60% of range, close in the outer 25% and beyond the zone; reclaim must touch/cross the level. It must form a same-direction three-candle M15 FVG of >=0.05 x preceding ATR, confirmed only when candle 3 closes. Only a later first M5 return, closing directionally inside the FVG and on the reclaimed side of the level, qualifies. Breached gaps, stale returns and entry quotes outside the gap are blocked. FVG lifetime 24 M15 bars. Any new same-direction trade after a close needs a reclaim formed after that close; broker history restores this barrier across restarts. All constants are initial engineering definitions, not fitted or performance-validated thresholds.
+
+Apply as one shared post-detection gate to all SA entry types, without enabling any previously rejected VP/counter-HTF strategy. Preserve candidate SL/TP, risk, sessions, news, costs and trigger priority. The gate narrows eligible entries; a reclaim/FVG without an existing valid trigger does not itself create an order. Full live/backtest gate and final quote-check parity are required. Scope is the SA scalper that produced the reported trades, not Pool A or Guardian exit geometry. The first profitable bounce may also be rejected. Compare prior trades and synthetic valid/invalid paths; make no performance claim from the motivating losses.
+
+
+### L-017 implementation outcome - 2026-09-02
+
+Implemented shared `scalper/reclaim_fvg.py`, enabled by default, configuration era `2026-09-02-reclaim-fvg`. Every SA entry type now checks the declared displacement-reclaim/FVG-return sequence at relevant broken levels. Same-direction close barriers include Guardian exits and restore from broker history. Missing history, incomplete sequences, missing candles and quotes outside the qualified FVG block entry. Backtest uses the same evaluator and an M5 decision clock; the trigger frame remains M15. SELL is symmetric.
+
+Validation: 425 tests pass (27 new), compileall passes, bounded full-pipeline smoke with Guardian exits completes. Yesterday's 494729996 loss (-$28.32) and both morning buys today (+$15.73, -$27.18) fail WAIT_LEVEL under broker-confirmed swing levels. This is implementation validation on development data, not demonstrated loss reduction. Full details and artifact paths: `docs/reviews/2026-09-02-reclaim-fvg-correction.md`. VP/profile arm C remains open; no automatic short or real-money promotion.
+
+
+**Demo activation verified:** 2 September 13:11:41 UTC (18:11:41 Pakistan), gate ON, five close barriers restored, existing position adopted. Guardian remained running. See the correction report for process, broker and code-hash evidence.
+
+
+## L-018 - M15 FVG entry toward a structural target
+
+**Status: IMPLEMENTED AND VALIDATED, operator-directed DEMO contract; efficacy unverified.** Operator supplied a second screenshot, proposed entry around 4300 at a bullish M15 FVG with TP around 4324, and explicitly requested implementation and relaunch of scalper/TGA.
+
+Shared `scalper/m15_fvg_entry.py` uses closed M15 displacement/FVG formation, current executable in-gap quote, existing 0.3 ATR FVG stop buffer, TP before the nearest broken M15 swing level, and unchanged >=2R/cost floors. Reuses L-017 displacement, gap-age and structural-break definitions. Full mitigation consumes a gap; another entry after a close needs a fresh departure and return. No fallback to the old M5 FVG when the M15 model is enabled. Both directions, all existing session/news/risk gates, live/backtest parity. TGA preserves structural TP using the durable order comment, with matching simulation behavior. Config era `2026-09-02-m15-fvg-target`.
+
+Broker ticks: first revisit minimum ask 4301.357 at 04:20:37.795 UTC; second 4301.901 at 10:06:59.372. Exact 4300 was unavailable. Broker gap 4294.004-4302.272 was confirmed at 04:15. First structural target ~4322.103 and stop ~4289.939 admit hypothetical 4300 geometry but reject the actual higher ask for R<2; a nearer broken level limits the second revisit further. Both are outside current session windows; clarification requested, no session override added.
+
+447 tests, compileall and bounded Guardian-enabled pipeline smoke pass. No new M15 FVG fills in that smoke; no efficacy, baseline or OOS claim. Full definition, artifacts and relaunch evidence: `docs/reviews/2026-09-02-m15-fvg-entry.md`. Preserve the chart example as a plan, not a fabricated executed trade.
+
+
+**L-018 activation verified:** scalper 22532 and TGA 19324 running since 13:39 UTC, DEMO account flat, M15 FVG mode and L-017 ON. Existing session windows preserved. Source hashes/process/broker evidence saved in the L-018 evidence directory.
+
+
+## L-019 - Priority D1/W1/MN1 liquidity-sweep CRT trigger
+
+Operator explicitly requests an actual first-priority trigger for prior daily, weekly and monthly BSL/SSL sweeps, supported by the 2 September daily reversal. Broker confirms PDL 4322.777, low 4282.332, daily close 4385.502 back inside. Implemented `HTF_CRT_SWEEP` with shared closed-bar raid, displacement reclaim, resulting M15 FVG and later executable return. Range-based target capped by nearer broken structure, SL beyond raid, >=2R and cost floor. Native calendar frames, both directions, first watch outside sessions but normal entry gates, durable per-symbol setup identifiers, live/backtest parity and Guardian target preservation. See `docs/reviews/2026-09-03-htf-crt-trigger.md` for exact conditions and validation. Default enabled for operator-directed DEMO; no efficacy or real-money-promotion claim. Prior vault FS-4 negatives/inconclusive results are retained.
+
+
+L-019 verification: 473 tests and compileall pass. Final 11:00–15:00 UTC broker-data replay completes with zero eligible entries; no profitability claim. Demo activation verified 3 September 05:11 UTC / 10:11 Pakistan: scalper PID 25460 and TGA PID 192, watchdog 7704. Broker flat; all three frame watches active and existing entry gates retained. Source hashes, process snapshots and activation logs are in the L-019 review evidence folder.
+
+## L-020 - Measure CRT confluences before claiming improvement
+
+Operator requested MQL5/vault research and stronger HTF external-raid confirmations. Frozen two additions before inspecting new outcomes: M15 opposing-swing break on the FVG-producing displacement, then fresh completed M5 directional FVG-return rejection. Implemented shared live/replay OBSERVE, MSS and MSS_RETEST modes, final strict confirmation-expiry check, measured XAUUSD total execution-cost replacement, candidate/trade labels and retry after transient watch failure. Default OBSERVE; no generic RSI/ADX/MA/POC threshold activated.
+
+488 tests and compileall pass. Full June-August 2026 three-arm replay: all arms 139 whole-bot trades, zero eligible CRT candidates/trades, identical +$91.48 / +6.768R, PF1.040. Fold P&L +171.87/-276.15/+195.76; fixed-trade 0.75 USD/oz cost scenario -$108.92. No incremental inference or promotion possible. Preserve prior FS-4/FS-5 findings. Source report images inspected; vault IFVG missing-statistics note corrected by dated addition, without confidence promotion.
+
+Activated OBSERVE on broker-verified DEMO at 05:53 UTC / 10:53 Pakistan, scalper4668/TGA26576/watchdog7704, flat before and after. Full conditions, results, limitations and artifacts: `docs/reviews/2026-09-03-crt-confluence-review.md`; frozen spec and MQL5 catalogue are adjacent. This is measurement infrastructure, not a validated profitable filter.

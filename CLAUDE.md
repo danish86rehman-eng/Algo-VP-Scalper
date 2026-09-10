@@ -154,6 +154,14 @@ python scalper_agent.py --pool 500 --risk 0.02 --symbols USOIL,XAUUSD,XAGUSD --i
 ```
 Only one scalper may run at a time: the process holds `127.0.0.1:55556` and a
 duplicate exits (the Guardian's equivalent lock is on 55555).
+
+Operator-approved active trigger precedence (2026-09-07):
+`SWEEP_REJECTION -> HTF_CRT_SWEEP -> FVG_FILL -> BOS_RETEST -> JUDAS`.
+`VPLR_ENABLED` and `VA_FADE_ENABLED` remain false. The shared trigger engine
+implements this order for both live and replay; `--triggers` is a whitelist,
+not a way to reorder it. This is an operator policy choice, not a claim of
+fold-consistent profitability; see the September 7 trigger-priority study.
+
 - Completely independent of maingpt.py (can start/stop separately)
 - Isolated capital pool (never touches main account balance beyond its pool)
 - Uses Magic Number `88880` for all orders
@@ -499,13 +507,17 @@ Note: Windows Execution Aliases create parent-child pairs (alias → real interp
    gate, first match wins, and the only thing that decides whether the scalper
    scans at all:
 
-   | Window | UTC | Priority |
-   |---|---|---|
-   | `TOKYO_OPEN` | 00:00–02:00 | 2 |
-   | `PRE_LONDON` | 06:30–07:00 | 2 |
-   | `LONDON_OPEN` | 07:00–08:30 | 1 |
-   | `LONDON_NY` | 12:00–13:30 | 1 |
-   | `NY_LUNCH_REV` | 16:30–17:30 | 3 |
+   | Window | UTC | Priority | Default |
+   |---|---|---|---|
+   | `TOKYO_OPEN` | 00:00–02:00 | 2 | enabled |
+   | `PRE_LONDON` | 06:30–07:00 | 2 | disabled |
+   | `LONDON_OPEN` | 07:00–08:30 | 1 | disabled |
+   | `LONDON_NY` | 12:00–13:30 | 1 | enabled |
+   | `NY_LUNCH_REV` | 16:30–17:30 | 3 | disabled |
+
+   The production default is defined once as
+   `DEFAULT_ENABLED_SESSIONS = ("TOKYO_OPEN", "LONDON_NY")`. Disabled named
+   windows remain available only through an explicit `--sessions` whitelist.
 
    `Whole_day` (00:00–23:00) is opt-in only — §13.6, ledger L-010.
 

@@ -1,0 +1,3 @@
+2026-09-02 13:39:38,228Z [TGA] INFO: TGA: attached to running MT5 session | Account=40280210
+2026-09-02 13:39:38,228Z [TGA] INFO: 🛡️ TGA Initialized | Stage ladder: BE@1.0R (+ 2-candle struct confirm) | Trail@1.5R | AggrTrail@2.5R | EarlyCloseArm=1.0R
+2026-09-02 13:39:38,228Z [TGA] INFO: 🛡️ TGA Main Loop Started

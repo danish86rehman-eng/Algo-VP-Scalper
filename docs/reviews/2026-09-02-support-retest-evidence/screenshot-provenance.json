@@ -1,0 +1,17 @@
+{
+  "source_path": "C:\\Users\\nauman.afzal.ORIENTPET\\Downloads\\XAUUSD_2026-09-02_17-33-04.png",
+  "vault_copy": "D:\\OneDrive - Orient Petroleum\\Personal\\Obsidian\\AI-Trading-Strategies\\journal\\reviews\\assets\\xauusd-support-retest-2026-09-02-1232-utc.png",
+  "sha256": "e709ad05e55202ed505c2ad2b86f8736b3be453ea8c3966db7812361f1e06950",
+  "chart_header_time_utc": "2026-09-02 12:32",
+  "file_name_time": "2026-09-02 17:33:04 (timezone not embedded in filename)",
+  "visible_symbol": "XAUUSD",
+  "marked_level": 4324.76,
+  "displayed_price_at_capture": 4334.14,
+  "user_identified_poc_approx": 4328,
+  "profile_window_bins_feed": "UNKNOWN",
+  "limitations": [
+    "The screenshot is later than the morning entries; it does not establish the POC value available then.",
+    "M15 chart timeframe is supplied by the operator; timeframe/feed/profile-settings panels are not shown.",
+    "White horizontal line and visible volume concentration are around the user-identified 4328 area; exact POC label is not visible."
+  ]
+}

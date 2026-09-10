@@ -1,0 +1,203 @@
+{
+  "window": "W1",
+  "arm": "TOP_JUDAS",
+  "start": "2026-03-01 00:00:00+00:00",
+  "end_exclusive": "2026-06-01 00:00:00+00:00",
+  "trades": 40,
+  "pnl": -115.91,
+  "ending_balance": 884.09,
+  "gross_pnl": -82.31,
+  "win_rate_pct": 45.0,
+  "profit_factor": 0.813757310881162,
+  "sum_net_r": -1.5532653993152468,
+  "max_closed_balance_drawdown": 203.63,
+  "max_closed_balance_drawdown_pct": 19.59242973838916,
+  "cost_overlay_fixed_trades": {
+    "0.17": -98.63,
+    "0.35": -115.91,
+    "0.75": -154.31
+  },
+  "folds": [
+    {
+      "trades": 15,
+      "pnl": -98.58,
+      "ending_balance": 901.42,
+      "gross_pnl": -86.33,
+      "win_rate_pct": 40.0,
+      "profit_factor": 0.6397061510909688,
+      "sum_net_r": -2.99643518312779,
+      "max_closed_balance_drawdown": 137.91,
+      "max_closed_balance_drawdown_pct": 13.269125301877166,
+      "cost_overlay_fixed_trades": {
+        "0.17": -92.28,
+        "0.35": -98.58,
+        "0.75": -112.58
+      }
+    },
+    {
+      "trades": 13,
+      "pnl": 58.43,
+      "ending_balance": 1058.43,
+      "gross_pnl": 70.68,
+      "win_rate_pct": 61.53846153846154,
+      "profit_factor": 1.4050887409872432,
+      "sum_net_r": 3.077509840754347,
+      "max_closed_balance_drawdown": 68.67,
+      "max_closed_balance_drawdown_pct": 6.627802604020883,
+      "cost_overlay_fixed_trades": {
+        "0.17": 64.73,
+        "0.35": 58.43,
+        "0.75": 44.43
+      }
+    },
+    {
+      "trades": 12,
+      "pnl": -75.76,
+      "ending_balance": 924.24,
+      "gross_pnl": -66.66,
+      "win_rate_pct": 33.333333333333336,
+      "profit_factor": 0.6295535670627354,
+      "sum_net_r": -1.6343400569418034,
+      "max_closed_balance_drawdown": 178.77,
+      "max_closed_balance_drawdown_pct": 16.951129316720728,
+      "cost_overlay_fixed_trades": {
+        "0.17": -71.08,
+        "0.35": -75.76,
+        "0.75": -86.16
+      }
+    }
+  ],
+  "trigger_breakdown": {
+    "HTF_CRT_SWEEP": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "FVG_FILL": {
+      "trades": 1,
+      "pnl": 7.39,
+      "ending_balance": 1007.39,
+      "gross_pnl": 8.79,
+      "win_rate_pct": 100.0,
+      "profit_factor": null,
+      "sum_net_r": 0.300284437220642,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 8.11,
+        "0.35": 7.39,
+        "0.75": 5.79
+      }
+    },
+    "SWEEP_REJECTION": {
+      "trades": 35,
+      "pnl": -182.19,
+      "ending_balance": 817.81,
+      "gross_pnl": -152.09,
+      "win_rate_pct": 40.0,
+      "profit_factor": 0.6932518436205677,
+      "sum_net_r": -4.973537047547504,
+      "max_closed_balance_drawdown": 269.91,
+      "max_closed_balance_drawdown_pct": 25.969615040458738,
+      "cost_overlay_fixed_trades": {
+        "0.17": -166.71,
+        "0.35": -182.19,
+        "0.75": -216.59
+      }
+    },
+    "BOS_RETEST": {
+      "trades": 0,
+      "pnl": 0,
+      "ending_balance": 1000.0,
+      "gross_pnl": 0,
+      "win_rate_pct": null,
+      "profit_factor": null,
+      "sum_net_r": 0,
+      "max_closed_balance_drawdown": 0.0,
+      "max_closed_balance_drawdown_pct": 0.0,
+      "cost_overlay_fixed_trades": {
+        "0.17": 0,
+        "0.35": 0,
+        "0.75": 0
+      }
+    },
+    "JUDAS": {
+      "trades": 4,
+      "pnl": 58.89,
+      "ending_balance": 1058.89,
+      "gross_pnl": 60.99,
+      "win_rate_pct": 75.0,
+      "profit_factor": 3.0721323011963406,
+      "sum_net_r": 3.119987211011616,
+      "max_closed_balance_drawdown": 28.42,
+      "max_closed_balance_drawdown_pct": 2.827129299882613,
+      "cost_overlay_fixed_trades": {
+        "0.17": 59.97,
+        "0.35": 58.89,
+        "0.75": 56.49
+      }
+    }
+  },
+  "triggers_detected": {
+    "SWEEP_REJECTION": 1339,
+    "JUDAS": 898,
+    "BOS_RETEST": 36,
+    "FVG_FILL": 5,
+    "HTF_CRT_SWEEP": 1
+  },
+  "rejections": {
+    "SESSION": 14965,
+    "RECLAIM_WAIT_LEVEL": 1513,
+    "RECLAIM_WAIT_DISPLACEMENT": 214,
+    "M15_FVG_CONSUMED": 205,
+    "SYMBOL_DEDUP": 199,
+    "COOLDOWN": 133,
+    "RECLAIM_WAIT_FVG": 87,
+    "NO_TRIGGER": 77,
+    "RECLAIM_WAIT_RETURN": 76,
+    "LOT_FLOOR": 74,
+    "STB": 60,
+    "STEP3": 57,
+    "CONSUL_GATE1_REGIME": 57,
+    "STB/range_guard": 46,
+    "M15_FVG_NO_STRUCTURAL_TARGET": 45,
+    "M15_FVG_TARGET_R_TOO_SMALL": 42,
+    "RECLAIM_RETURN_STALE": 40,
+    "RECLAIM_INVALID_GEOMETRY": 30,
+    "M15_FVG_HISTORY_MISSING": 28,
+    "RECLAIM_FVG_EXPIRED": 18,
+    "STB/dont_chase": 10,
+    "RECLAIM_FVG_INVALIDATED": 7,
+    "STB/opposes_short_term": 4,
+    "CRG": 3,
+    "RECLAIM_RETURN_UNCONFIRMED": 3
+  },
+  "arbitration_overlaps": {
+    "SWEEP_REJECTION > BOS_RETEST": 1051,
+    "SWEEP_REJECTION > BOS_RETEST > JUDAS": 436,
+    "SWEEP_REJECTION > JUDAS": 384,
+    "FVG_FILL > JUDAS": 1,
+    "BOS_RETEST > JUDAS": 21,
+    "FVG_FILL > SWEEP_REJECTION": 2,
+    "FVG_FILL > SWEEP_REJECTION > BOS_RETEST > JUDAS": 3,
+    "FVG_FILL > SWEEP_REJECTION > BOS_RETEST": 3
+  },
+  "possible_promotions": {
+    "BOS_RETEST": 1493,
+    "JUDAS": 845,
+    "SWEEP_REJECTION": 8
+  },
+  "arbitration_switches": 845,
+  "elapsed_seconds": 464.35367029999907
+}

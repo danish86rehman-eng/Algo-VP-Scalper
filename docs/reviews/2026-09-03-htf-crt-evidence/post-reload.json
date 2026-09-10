@@ -1,0 +1,15 @@
+{
+  "checked_utc": "2026-09-03T05:12:27.819333+00:00",
+  "demo": true,
+  "open_positions": 0,
+  "code_sha256": {
+    "apex_ai/scalper/htf_crt.py": "083a322c7c701b0a380211ba3559ad790af724cf001aeb65fb0ea32df931172f",
+    "apex_ai/scalper/trigger_engine.py": "432d365e3d480659685159fb5a1e57752f01e7e9c1bb51a7410617c3b23707c9",
+    "apex_ai/scalper/decision_params.py": "eeaeecdf4cc17180a78ca4f1cf96bf1e199bf9ef0821c19cf22badc683e96f92",
+    "apex_ai/scalper_agent.py": "fe29a33082d6d828a2fedcf49789e404788ba412dc8be28ea864bcfdae652b51",
+    "apex_ai/backtest_scalper.py": "480b0c18293c1bbf994c1f760c274070eca8fd046b37f03f326e6865bfbf7f61",
+    "apex_ai/trade_guardian_agent.py": "1f405700419f0f16cd535acdb8bc250f7ae7668f91deb0473bb0d722707101b4",
+    "apex_ai/tests/test_htf_crt.py": "a98091ab707f10dd758a5ef263436d5df81b17bad30e05d11ad80720c0de4a70",
+    "docs/reviews/crt_pipeline_smoke.py": "8927b48dba2c5455ae4c456f1c0cfac55cab85cd123f37e40372bada5172da67"
+  }
+}
