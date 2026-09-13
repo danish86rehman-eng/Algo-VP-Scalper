@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from core.constants import agent_for_magic, MAGIC_TGA, MAGIC_SCALPER
 from scalper.decision_params import M15_FVG_ORDER_COMMENT, CRT_ORDER_PREFIX
+from scalper.session_sweep import ORDER_PREFIX as SESSION_SWEEP_ORDER_PREFIX
 
 # ── Logging Setup ─────────────────────────────────────────────────────────────
 Path("logs").mkdir(exist_ok=True)
@@ -227,7 +228,8 @@ class TradeGuardianAgent:
                     entry_time=entry_time,
                     tp_extend_blocked=(p.magic == MAGIC_SCALPER
                                        and (getattr(p, "comment", "") == M15_FVG_ORDER_COMMENT
-                                            or getattr(p, "comment", "").startswith(CRT_ORDER_PREFIX))),
+                                            or getattr(p, "comment", "").startswith(CRT_ORDER_PREFIX)
+                                            or getattr(p, "comment", "").startswith(SESSION_SWEEP_ORDER_PREFIX))),
                 )
                 self.registry[p.ticket] = rec
                 logger.info(rec.print_registry())

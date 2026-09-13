@@ -198,6 +198,7 @@ class SimTrade:
     reclaim: Optional[dict] = None  # closed-bar permission used for this fill
     m15_fvg: Optional[dict] = None
     htf_crt: Optional[dict] = None
+    session_sweep: Optional[dict] = None
 
 
 def emit_incidents(all_trades, data, session_checker, path: str,
@@ -339,16 +340,17 @@ from scalper.exit_manager import ExitOutcome, SimulatedGuardian
 from scalper.reclaim_fvg import evaluate_reclaim, entry_in_reclaim_zone
 from scalper.m15_fvg_entry import find_fvg_entry, entry_quote_allowed
 from scalper.htf_crt import watch_crt, select_crt, crt_quote_allowed
+from scalper import session_sweep as SS
 import math
 
 
 def _execution_cost(symbol, volume, bar_spread, pip_value, commission_per_lot,
-                    round_trip_cost_price=None):
+                    round_trip_cost_price=None, symbol_info=None):
     if round_trip_cost_price is None:
         return bar_spread*pip_value*volume + commission_per_lot*volume
     # Total measured USD/oz cost already includes spread, commission and
     # slippage. This is a debit model, not a tick-level execution simulator.
-    info = mt5.symbol_info(symbol)
+    info = symbol_info if symbol_info is not None else mt5.symbol_info(symbol)
     if (symbol != "XAUUSD" or info is None or info.trade_contract_size <= 0
             or not math.isfinite(round_trip_cost_price) or round_trip_cost_price < 0):
         raise ValueError("Invalid measured XAUUSD execution-cost inputs")
@@ -361,19 +363,20 @@ def _order_pnl(symbol: str, direction: str, volume: float, entry: float, exit_pr
     return float(pnl) if pnl is not None else 0.0
 
 
-def _pip_value(symbol: str) -> float:
-    info = mt5.symbol_info(symbol)
+def _pip_value(symbol: str, symbol_info=None) -> float:
+    info = symbol_info if symbol_info is not None else mt5.symbol_info(symbol)
     if not info or info.point <= 0:
         return 0.0
     return info.trade_tick_value * 10.0
 
 
-def _calc_volume(symbol: str, risk_usd: float, entry: float, sl: float) -> float:
-    info = mt5.symbol_info(symbol)
+def _calc_volume(symbol: str, risk_usd: float, entry: float, sl: float,
+                 symbol_info=None) -> float:
+    info = symbol_info if symbol_info is not None else mt5.symbol_info(symbol)
     if not info or info.point <= 0:
         return 0.0
     sl_pips = abs(entry - sl) / info.point / 10.0
-    pip_value = _pip_value(symbol)
+    pip_value = _pip_value(symbol, info)
     if sl_pips <= 0 or pip_value <= 0:
         return 0.0
     volume = risk_usd / (sl_pips * pip_value)
@@ -524,7 +527,7 @@ def _apply_v1_council_gates(
     # Gate 3 — LIA macro TP2 realignment. Same helper the live agent calls.
     consult = apply_lia_override(
         consult, trigger.direction, trigger.tp1, trigger.tp2, current_price)
-    if consult.lia_tp2_override and trigger.fvg_entry is None and trigger.htf_crt is None:
+    if consult.lia_tp2_override and trigger.fvg_entry is None and trigger.htf_crt is None and trigger.session_sweep is None:
         trigger.tp2 = consult.lia_tp2_override
 
     return trigger, ""
@@ -562,7 +565,8 @@ def _schedule_exit(
             entry_price=trigger.entry_price, stop_loss=trigger.stop_loss,
             tp1=trigger.tp1, entry_time=entry_time, volume=volume,
             max_idx=max_idx, eod=eod,
-            tp_extend_blocked=trigger.fvg_entry is not None or trigger.htf_crt is not None)
+            tp_extend_blocked=(trigger.fvg_entry is not None or trigger.htf_crt is not None
+                               or trigger.session_sweep is not None))
         return (outcome.exit_price, outcome.result, outcome.exit_reason,
                 outcome.close_time, outcome)
 
@@ -642,6 +646,7 @@ def run_backtest(
     crt_confluence_mode: str = DP.CRT_CONFLUENCE_MODE,
     round_trip_cost_price: Optional[float] = None,
     watch_inactive_crt: bool = True,
+    session_sweep_enabled: bool = False,
 ) -> Dict:
     from scalper.crt_confluence import validate_mode
     validate_mode(crt_confluence_mode)
@@ -654,7 +659,7 @@ def run_backtest(
     # SWEEP_REJECTION in step2_trigger's first-match priority order.
     trigger_engine = SATriggerEngine(
         enabled_triggers=resolve_enabled_triggers(enabled_triggers,
-                                                  vplr_enabled, htf_crt_enabled),
+                                                  vplr_enabled, htf_crt_enabled, session_sweep_enabled),
         sweep_wick_filter=sweep_wick_filter,
         sweep_wick_ratio=sweep_wick_ratio)
     # Mirrors ScalperAgent's VP_LIQUIDITY_REACTION construction (invariant #2):
@@ -739,7 +744,11 @@ def run_backtest(
     data: Dict[str, Dict[str, pd.DataFrame]] = {}
     m5_index: Dict[str, pd.Index] = {}
     spread_by_symbol: Dict[str, pd.Series] = {}
+    symbol_info_by_symbol = {}
     events: List[Tuple[datetime, str, int]] = []
+    session_indexes = {}
+    session_used = set()
+    session_funnel = Counter()
 
     # Every decision frame is fetched with a lead-in *before* the requested
     # start so that the first tradable bar already has the same history behind
@@ -752,6 +761,20 @@ def run_backtest(
 
     for symbol in symbols:
         mt5.symbol_select(symbol, True)
+        info = mt5.symbol_info(symbol)
+        if (info is None or info.point <= 0 or info.trade_tick_value <= 0
+                or info.volume_min <= 0 or info.volume_step <= 0
+                or info.volume_max < info.volume_min
+                or (session_sweep_enabled and info.trade_tick_size <= 0)
+                or (round_trip_cost_price is not None
+                    and getattr(info, "trade_contract_size", 0) <= 0)):
+            raise RuntimeError(
+                f"Missing or invalid MT5 symbol metadata for {symbol} before replay: "
+                f"{mt5.last_error()}")
+        # MT5 metadata is contract data, not historical state. Snapshot it once:
+        # long event loops must not become invalid because a later terminal API
+        # call transiently returns None.
+        symbol_info_by_symbol[symbol] = info
         df_m5 = _fetch(symbol, mt5.TIMEFRAME_M5, warmup_from, dt_to)
         df_m15 = _fetch(symbol, mt5.TIMEFRAME_M15, warmup_from, dt_to)
         df_h1 = _fetch(symbol, mt5.TIMEFRAME_H1, warmup_from, dt_to)
@@ -761,6 +784,9 @@ def run_backtest(
             continue
         data[symbol] = {"M5": df_m5, "M15": df_m15, "H1": df_h1, "H4": df_h4,
                         "D1": df_d1}
+        if session_sweep_enabled and symbol == "XAUUSD":
+            session_indexes[symbol] = SS.reconstruct_levels(
+                _fetch(symbol, mt5.TIMEFRAME_M1, warmup_from, dt_to))
         if htf_crt_enabled:
             # Native calendar bars; warm the ten-bar monthly window without
             # fetching twelve months of M5 data.
@@ -773,7 +799,7 @@ def run_backtest(
         # Decisions are only scored inside the requested window; the lead-in
         # exists to feed the gates, not to generate trades.
         start_ts = pd.Timestamp(dt_from)
-        if reclaim_fvg_enabled or m15_fvg_entry_enabled or htf_crt_enabled:
+        if reclaim_fvg_enabled or m15_fvg_entry_enabled or htf_crt_enabled or session_sweep_enabled:
             # A return confirmed at :05/:10 must be observable, not postponed
             # to the next M15 bar when it is stale. The trigger frame remains
             # M15; only the decision clock follows completed M5 confirmations.
@@ -838,6 +864,7 @@ def run_backtest(
         # Same first watch as live, including IDLE/cooldown periods. Future
         # HTF rows are filtered by calendar close inside the shared evaluator.
         frames = data[symbol]
+        info = symbol_info_by_symbol[symbol]
         crt_plan = None
         if htf_crt_enabled and (watch_inactive_crt or not enforce_session_windows
                 or session_checker.get_state(now).in_window
@@ -960,6 +987,17 @@ def run_backtest(
                     symbol, _closed_tf(frames['H1'], now, HTF_BARS, 60), None),
             )
 
+        session_plan = None
+        if session_sweep_enabled and not vp_only_bar and symbol == "XAUUSD":
+            quote_idx = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side="left"))
+            if quote_idx < len(frames["M5"]):
+                quote = float(frames["M5"].iloc[quote_idx]["open"])
+                sspread = float(spread_by_symbol[symbol].iloc[i]) * info.point * 10.
+                session_plan = SS.evaluate(SS.as_of(session_indexes.get(symbol, []), now),
+                    df_m5_upto, quote, quote+sspread, now, session_used,
+                    info.trade_tick_size)
+                session_funnel[session_plan.reason] += 1
+
         m15_fvg_plan = None
         if m15_fvg_entry_enabled and not vp_only_bar:
             quote_idx = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side="left"))
@@ -981,7 +1019,8 @@ def run_backtest(
                 edge_tolerance_frac=VP_EDGE_TOLERANCE_FRAC,
                 poc_band_frac=VP_POC_BAND_FRAC,
                 vplr_ctx=vplr_ctx, m15_fvg_entry=m15_fvg_plan,
-                htf_crt=crt_plan if not vp_only_bar else None)
+                htf_crt=crt_plan if not vp_only_bar else None,
+                session_sweep=session_plan)
         finally:
             if vp_only_bar:
                 trigger_engine.enabled_triggers = saved_triggers
@@ -997,7 +1036,7 @@ def run_backtest(
 
         # Live reads this off the trigger frame's last bar (`df_m5` there is
         # the M15 stack under its historical variable name), so mirror that.
-        current_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt) else
+        current_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt or trigger.session_sweep) else
                          float(df_m15_upto["close"].iloc[-1]))
 
         # The broker's own spread for the bar being decided on, rather than one
@@ -1005,7 +1044,7 @@ def run_backtest(
         # settled quote — the same bar `current_price` comes from.
         bar_spread = float(spread_by_symbol[symbol].iloc[i - 1])
 
-        if reclaim_fvg_enabled:
+        if reclaim_fvg_enabled and trigger.session_sweep is None:
             gate_idx = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side="left"))
             if gate_idx >= len(frames["M5"]):
                 rejects["NO_M5_BAR"] += 1
@@ -1134,9 +1173,8 @@ def run_backtest(
             rejects_by_trigger[f"{why}:{ttype}"] += 1
             continue
 
-        info = mt5.symbol_info(symbol)
         sl_pips = (abs(trigger.entry_price - trigger.stop_loss)
-                   / info.point / 10.0) if info and info.point else 0.0
+                   / info.point / 10.0)
         valid, _ = trigger_engine.step3_validate(
             trigger, bar_spread, symbol, sl_pips=sl_pips)
         if not valid:
@@ -1161,7 +1199,8 @@ def run_backtest(
             continue
 
         risk_usd = balance * risk_pct
-        volume = _calc_volume(symbol, risk_usd, trigger.entry_price, trigger.stop_loss)
+        volume = _calc_volume(symbol, risk_usd, trigger.entry_price,
+                              trigger.stop_loss, info)
         if volume <= 0:
             rejects["LOT_FLOOR"] += 1
             rejects_by_trigger[f"LOT_FLOOR:{ttype}"] += 1
@@ -1176,6 +1215,25 @@ def run_backtest(
 
         fill_price = _entry_fill_price(frames["M5"], entry_idx, trigger,
                                        fill_at_next_bar_open)
+        if trigger.session_sweep:
+            # Generic replay books bid-price P&L and debits spread later.
+            # Validate and size this trigger on the executable side of quote.
+            execution_price = fill_price + (bar_spread*info.point*10.
+                              if trigger.direction == "BULLISH" else 0.)
+            if not SS.quote_allowed(trigger.session_sweep, execution_price, now):
+                rejects["SESSION_SWEEP_QUOTE_MOVED"] += 1
+                continue
+            quoted = replace(trigger, entry_price=execution_price)
+            valid, _ = trigger_engine.step3_validate(quoted, bar_spread, symbol,
+                sl_pips=abs(execution_price-trigger.stop_loss)/info.point/10.)
+            if not valid:
+                rejects["SESSION_SWEEP_FINAL_COST"] += 1
+                continue
+            volume = min(volume, _calc_volume(symbol, risk_usd, execution_price,
+                                              trigger.stop_loss, info))
+            if volume <= 0:
+                rejects["SESSION_SWEEP_LOT_FLOOR"] += 1
+                continue
         fvg_plan = trigger.htf_crt or trigger.fvg_entry
         quote_guard = ((lambda p, q: crt_quote_allowed(p, q, now))
                        if trigger.htf_crt else entry_quote_allowed)
@@ -1190,7 +1248,8 @@ def run_backtest(
             if not valid:
                 rejects[f"{family}_FINAL_COST_GATE"] += 1
                 continue
-        if reclaim_fvg_enabled and not entry_in_reclaim_zone(trigger.reclaim, fill_price):
+        if (reclaim_fvg_enabled and trigger.session_sweep is None
+                and not entry_in_reclaim_zone(trigger.reclaim, fill_price)):
             rejects["RECLAIM_QUOTE_MOVED"] += 1
             rejects_by_trigger[f"RECLAIM_QUOTE_MOVED:{ttype}"] += 1
             continue
@@ -1199,11 +1258,9 @@ def run_backtest(
             # Lot geometry decides whether a TP-extension partial can fill at
             # all; a 0.01-lot position cannot be halved and lives sets
             # `tp_extend_blocked`. Read per symbol, not assumed.
-            _info = mt5.symbol_info(symbol)
-            if _info:
-                guardian.volume_min = _info.volume_min
-                guardian.volume_step = _info.volume_step
-                guardian.min_sl_move = _info.point * 10.0
+            guardian.volume_min = info.volume_min
+            guardian.volume_step = info.volume_step
+            guardian.min_sl_move = info.point * 10.0
 
         exit_price, result, reason, close_time, outcome = _schedule_exit(
             frames["M5"], entry_idx, trigger, now, guardian, volume)
@@ -1222,12 +1279,12 @@ def run_backtest(
         else:
             gross = _order_pnl(symbol, trigger.direction, volume,
                                fill_price, exit_price)
-        pip_val = _pip_value(symbol)
+        pip_val = _pip_value(symbol, info)
         # Round-turn spread is paid once (buy the ask, sell the bid); commission
         # is per round-turn lot. Article 19141's model excludes both, so the
         # simulator applies them explicitly rather than reporting gross R.
         cost = _execution_cost(symbol, volume, bar_spread, pip_val,
-                               commission_per_lot, round_trip_cost_price)
+                               commission_per_lot, round_trip_cost_price, info)
         net = gross - cost
         realised_risk = sl_pips * pip_val * volume
 
@@ -1255,6 +1312,7 @@ def run_backtest(
             reclaim=trigger.reclaim.record() if trigger.reclaim else None,
             m15_fvg=trigger.fvg_entry.record() if trigger.fvg_entry else None,
             htf_crt=trigger.htf_crt.record() if trigger.htf_crt else None,
+            session_sweep=trigger.session_sweep.record() if trigger.session_sweep else None,
             tga_managed=outcome is not None,
             tga_sl_stage=(outcome.sl_stage if outcome else 0),
             tga_peak_r=round(outcome.peak_r, 4) if outcome else 0.0,
@@ -1285,6 +1343,8 @@ def run_backtest(
         open_trades[symbol] = {"trade": trade}
         if trigger.htf_crt:
             crt_used.add(trigger.htf_crt.setup_id)
+        if trigger.session_sweep:
+            session_used.add(trigger.session_sweep.setup_id)
         pending_exits.append({"close_time": close_time, "trade": trade})
         pending_exits.sort(key=lambda p: p["close_time"])
 
@@ -1340,6 +1400,8 @@ def run_backtest(
             "reclaim_fvg_enabled": reclaim_fvg_enabled,
             "m15_fvg_entry_enabled": m15_fvg_entry_enabled,
             "htf_crt_enabled": htf_crt_enabled,
+            "session_sweep_enabled": session_sweep_enabled,
+            "session_sweep_funnel": dict(session_funnel),
             "crt_confluence_mode": crt_confluence_mode,
             "watch_inactive_crt": watch_inactive_crt,
             "round_trip_cost_price": round_trip_cost_price,
@@ -1527,6 +1589,8 @@ def main() -> None:
     parser.add_argument("--loss-cooldown-policy", type=str, default="NEXT_UTC_HOUR",
                         choices=["NEXT_UTC_HOUR", "FIXED_MINUTES"])
     parser.add_argument("--allow-whole-day", action="store_true")
+    parser.add_argument("--session-sweep", action="store_true",
+                        help="Replay session-sweep trigger from historical M1, never the current vault CSV")
     parser.add_argument("--triggers", type=str, default=None,
                         help="Comma-separated trigger whitelist "
                              "(SWEEP_REJECTION,FVG_FILL,BOS_RETEST,JUDAS). "
@@ -1583,6 +1647,7 @@ def main() -> None:
             reclaim_fvg_enabled=args.reclaim_fvg,
             m15_fvg_entry_enabled=args.m15_fvg_entry,
             htf_crt_enabled=args.htf_crt,
+            session_sweep_enabled=args.session_sweep,
             crt_confluence_mode=args.crt_confluence_mode,
             round_trip_cost_price=args.round_trip_cost_price,
             watch_inactive_crt=args.watch_inactive_crt,

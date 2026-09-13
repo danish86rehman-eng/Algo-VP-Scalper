@@ -131,6 +131,7 @@ from scalper.reclaim_fvg     import (evaluate_reclaim, entry_in_reclaim_zone,
                                      close_barriers)
 from scalper.m15_fvg_entry   import find_fvg_entry, entry_quote_allowed
 from scalper.htf_crt         import watch_crt, select_crt, used_setups, crt_quote_allowed
+from scalper import session_sweep as SS
 from scalper.ema_filter      import EMABandFilter  # H1 EMA(18) high/low band
 from scalper.leg_confluence  import (MODES as LEG_CONF_MODES, build_leg_pair,
                                      evaluate as leg_conf_evaluate)
@@ -296,10 +297,15 @@ class ScalperAgent:
                  pdr_gate_mode: str = DP.PDR_GATE_MODE,
                  vplr_enabled: bool = DP.VPLR_ENABLED,
                  vplr_session_override: bool = DP.VPLR_SESSION_OVERRIDE_ENABLED,
-                 pool_mode: str = "RESUME"):
+                 pool_mode: str = "RESUME",
+                 session_sweep_enabled: bool = False,
+                 session_liquidity_vault: str = SS.DEFAULT_VAULT):
         self.symbols    = symbols
         self.interval   = interval
         self.dry_run    = dry_run
+        self.session_sweep_enabled = session_sweep_enabled
+        self.session_liquidity_vault = session_liquidity_vault
+        self._session_sweep_attempt_dir = Path(__file__).parent / "data/session_sweep_attempts"
         self.reclaim_fvg_enabled = reclaim_fvg_enabled
         self.m15_fvg_entry_enabled = m15_fvg_entry_enabled
         self.htf_crt_enabled = htf_crt_enabled
@@ -373,7 +379,8 @@ class ScalperAgent:
         # trigger behind it. Mirrored in backtest_scalper.py (invariant #2).
         self.trigger_eng = SATriggerEngine(
             enabled_triggers=resolve_enabled_triggers(enabled_triggers,
-                                                      self.vplr_enabled, htf_crt_enabled),
+                                                      self.vplr_enabled, htf_crt_enabled,
+                                                      session_sweep_enabled),
             sweep_wick_filter=sweep_wick_filter,
             sweep_wick_ratio=sweep_wick_ratio)
         self.state_mach  = SABehaviorStateMachine()
@@ -714,6 +721,10 @@ class ScalperAgent:
                         None),
                 )
 
+        session_sweep_plan = None
+        if getattr(self, "session_sweep_enabled", False) and not vp_only:
+            session_sweep_plan = self._session_sweep_candidate(symbol, df_m1, now)
+
         m15_fvg_plan = None
         if self.m15_fvg_entry_enabled and not vp_only:
             if not self._reclaim_history_ready:
@@ -744,7 +755,8 @@ class ScalperAgent:
                 edge_tolerance_frac=DP.VP_EDGE_TOLERANCE_FRAC,
                 poc_band_frac=DP.VP_POC_BAND_FRAC,
                 vplr_ctx=vplr_ctx, m15_fvg_entry=m15_fvg_plan,
-                htf_crt=self._crt_candidate(symbol, df_m5, df_m1, now) if not vp_only else None)
+                htf_crt=self._crt_candidate(symbol, df_m5, df_m1, now) if not vp_only else None,
+                session_sweep=session_sweep_plan)
         finally:
             if vp_only:
                 self.trigger_eng.enabled_triggers = saved
@@ -759,7 +771,7 @@ class ScalperAgent:
             self.rejects.record("NO_TRIGGER", symbol, reason, now)
             return
 
-        analysis_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt) else
+        analysis_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt or trigger.session_sweep) else
                           float(df_m5['close'].iloc[-1]))
         if trigger.matched_triggers and len(trigger.matched_triggers) > 1:
             logger.info(
@@ -772,7 +784,7 @@ class ScalperAgent:
 
         # L-017 is a mandatory sequence check for every entry type. A local
         # sweep never substitutes for reclaiming broken support/resistance.
-        if self.reclaim_fvg_enabled:
+        if self.reclaim_fvg_enabled and trigger.session_sweep is None:
             if not self._reclaim_history_ready:
                 self.rejects.record("RECLAIM_HISTORY_UNAVAILABLE", symbol,
                                     "cannot restore prior-entry barrier", now)
@@ -1059,7 +1071,7 @@ class ScalperAgent:
                 return
 
             # Gate 3 — LIA TP2 Override
-            if consult.lia_tp2_override and trigger.fvg_entry is None and trigger.htf_crt is None:
+            if consult.lia_tp2_override and trigger.fvg_entry is None and trigger.htf_crt is None and trigger.session_sweep is None:
                 trigger.tp2 = consult.lia_tp2_override
                 logger.info(
                     f"SA {symbol}: CONSUL Gate 3 — TP2 realigned to macro H1 pool "
@@ -1181,6 +1193,7 @@ class ScalperAgent:
                 "reclaim": trigger.reclaim.record() if trigger.reclaim else None,
                 "m15_fvg": trigger.fvg_entry.record() if trigger.fvg_entry else None,
                 "htf_crt": trigger.htf_crt.record() if trigger.htf_crt else None,
+                "session_sweep": trigger.session_sweep.record() if trigger.session_sweep else None,
                 "regime": consult.regime,
                 "lots": lot_size,
                 # Cost and risk as they stood at entry. The forensic pass
@@ -1201,6 +1214,7 @@ class ScalperAgent:
                                        df_m15, df_m5) -> dict:
         """Serialize already-known tags; the worker performs all enrichment."""
         vplr = _vplr_record(trigger) or {}
+        ss_plan = getattr(trigger, "session_sweep", None)
         entry_price = float(trigger.entry_price)
         risk = abs(entry_price - float(trigger.stop_loss))
         opposing = abs(float(trigger.tp1) - entry_price) / risk if risk else None
@@ -1208,11 +1222,13 @@ class ScalperAgent:
         allowed_events = {
             "D1_BSL_RAID", "D1_SSL_RAID", "W1_BSL_RAID", "W1_SSL_RAID",
             "MN1_BSL_RAID", "MN1_SSL_RAID", "INTERNAL_SWEEP", "NONE",
+            "SESSION_BSL_RAID", "SESSION_SSL_RAID",
         }
-        event = raw_event if raw_event in allowed_events else (
-            "INTERNAL_SWEEP" if "SWEEP" in raw_event else "NONE")
+        event = (f"SESSION_{ss_plan.side}_RAID" if ss_plan else
+                 raw_event if raw_event in allowed_events else
+                 "INTERNAL_SWEEP" if "SWEEP" in raw_event else "NONE")
         raid_time_msc = None
-        raid_time = vplr.get("raid_time")
+        raid_time = ss_plan.raid_at if ss_plan else vplr.get("raid_time")
         if raid_time:
             try:
                 parsed = datetime.fromisoformat(str(raid_time).replace("Z", "+00:00"))
@@ -1234,18 +1250,19 @@ class ScalperAgent:
             "config_era": DP.CONFIG_ERA,
             "liquidity_event_type": event,
             "liquidity_event_raw": raw_event,
-            "reference_tf": vplr.get("profile_type") or "UNKNOWN",
-            "reference_level": vplr.get("level_source") or "UNKNOWN",
+            "reference_tf": f"SESSION_{ss_plan.session}" if ss_plan else vplr.get("profile_type") or "UNKNOWN",
+            "reference_level": (f"{ss_plan.session}_{ss_plan.side}"
+                                if ss_plan else vplr.get("level_source") or "UNKNOWN"),
             "raid_depth_atr": raid_depth_atr,
             "raid_depth_spreads": None,
             "reclaim_bars": None,
             "failed_acceptance": None,
             "m15_mss": bool(vplr.get("mss_time")) or None,
-            "m5_mss": None,
+            "m5_mss": True if ss_plan else None,
             "entry_location": location,
             "opposing_liquidity_distance_R": opposing,
             "news_mode": "CLEAR",
-            "raid_session": "UNKNOWN",
+            "raid_session": ss_plan.session if ss_plan else "UNKNOWN",
             "entry_session": self.session.vp_window_name(now),
             "regime": getattr(consult, "regime", "UNKNOWN"),
             "regime_confidence": getattr(consult, "regime_confidence", None),
@@ -1270,6 +1287,26 @@ class ScalperAgent:
             price      = tick.ask if trigger.direction == "BULLISH" else tick.bid
             point      = info.point
 
+            ss_plan = getattr(trigger, "session_sweep", None)
+            if ss_plan:
+                account = mt5.account_info()
+                if (not account or not 0 <= time.time()-tick.time <= 60
+                        or account.login != SS.EXPECTED_LOGIN
+                        or account.server != SS.EXPECTED_SERVER
+                        or not SS.quote_allowed(ss_plan, price, datetime.now(timezone.utc))):
+                    logger.warning(f"SA {symbol}: SESSION_SWEEP_FINAL_QUOTE_OR_ACCOUNT")
+                    return None
+                valid, why = self.trigger_eng.step3_validate(
+                    replace(trigger, entry_price=price), (tick.ask-tick.bid)/point/10., symbol,
+                    sl_pips=abs(price-trigger.stop_loss)/point/10.)
+                if not valid:
+                    logger.warning(f"SA {symbol}: SESSION_SWEEP_FINAL_COST — {why}")
+                    return None
+                # Never enlarge risk because the quote moved since detection.
+                lot_size = min(lot_size, self._calculate_lots(symbol, replace(trigger, entry_price=price)))
+                if lot_size <= 0:
+                    return None
+
             crt_plan = getattr(trigger, "htf_crt", None)
             fvg_plan = crt_plan or getattr(trigger, "fvg_entry", None)
             quote_guard = ((lambda p, q: crt_quote_allowed(p, q, datetime.now(timezone.utc)))
@@ -1287,7 +1324,8 @@ class ScalperAgent:
                     logger.warning(f"SA {symbol}: {family}_FINAL_COST_GATE — {why}")
                     return None
 
-            if getattr(self, "reclaim_fvg_enabled", False):
+            if (getattr(self, "reclaim_fvg_enabled", False)
+                    and getattr(trigger, "session_sweep", None) is None):
                 permission = getattr(trigger, "reclaim", None)
                 if permission is None or not entry_in_reclaim_zone(permission, price):
                     logger.warning(f"SA {symbol}: RECLAIM_QUOTE_MOVED — skip entry at {price}")
@@ -1308,7 +1346,8 @@ class ScalperAgent:
                 "tp":        tp,
                 "deviation": 10,
                 "magic":     MAGIC_SCALPER,
-                "comment":   (DP.CRT_ORDER_PREFIX + crt_plan.setup_id if crt_plan else
+                "comment":   (SS.ORDER_PREFIX + ss_plan.setup_id if ss_plan else
+                              DP.CRT_ORDER_PREFIX + crt_plan.setup_id if crt_plan else
                               DP.M15_FVG_ORDER_COMMENT if fvg_plan else
                               f"SA_{trigger.trigger_type[:4]}"),
                 "type_time": mt5.ORDER_TIME_GTC,
@@ -1318,6 +1357,9 @@ class ScalperAgent:
             decision_time = datetime.now(timezone.utc)
             submit_time = datetime.now(timezone.utc)
             submit_clock = time.perf_counter_ns()
+            if ss_plan and not SS.reserve_attempt(self._session_sweep_attempt_dir, ss_plan.setup_id):
+                logger.warning(f"SA {symbol}: SESSION_SWEEP_ALREADY_ATTEMPTED {ss_plan.setup_id}")
+                return None
             result = mt5.order_send(request)
             confirm_time = datetime.now(timezone.utc)
             latency_ms = (time.perf_counter_ns() - submit_clock) / 1_000_000
@@ -1865,7 +1907,9 @@ class ScalperAgent:
             sa_pool_risk_pct = round(self.pool.risk_pct * 100, 2),
             sa_state_after   = self.state_mach.state.value,
             ticket           = ticket,
-            notes            = ("HTF_CRT_SWEEP " + json.dumps(trigger.htf_crt.record())
+            notes            = ("SESSION_SWEEP " + json.dumps(trigger.session_sweep.record())
+                                if getattr(trigger, "session_sweep", None) else
+                                "HTF_CRT_SWEEP " + json.dumps(trigger.htf_crt.record())
                                 if getattr(trigger, "htf_crt", None) else
                                 "M15_FVG_ENTRY " + json.dumps(trigger.fvg_entry.record())
                                 if getattr(trigger, "fvg_entry", None) else ""),
@@ -1873,6 +1917,26 @@ class ScalperAgent:
         self.trade_log.log_open(record)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _session_sweep_candidate(self, symbol, m5, now):
+        if symbol != "XAUUSD":
+            return SS.Plan(reason="SESSION_SWEEP_SYMBOL_UNSUPPORTED")
+        try:
+            info, tick, account = mt5.symbol_info(symbol), mt5.symbol_info_tick(symbol), mt5.account_info()
+            if not info or not tick or not account:
+                raise ValueError("SESSION_SWEEP_MT5_UNAVAILABLE")
+            if not 0 <= now.timestamp()-tick.time <= 60:
+                raise ValueError("SESSION_SWEEP_TICK_STALE")
+            levels = SS.load_levels(self.session_liquidity_vault, now, account.login, account.server)
+            used = {p.stem for p in self._session_sweep_attempt_dir.glob("*.attempt")}
+            plan = SS.evaluate(levels, m5, tick.bid, tick.ask, now, used,
+                               info.trade_tick_size or info.point)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            plan = SS.Plan(reason=f"SESSION_SWEEP_DATA_BLOCKED: {exc}")
+        logger.info(f"SA {symbol}: SESSION SWEEP | {plan.record()}")
+        if not plan.allow:
+            self.rejects.record("SESSION_SWEEP", symbol, plan.reason, now)
+        return plan
 
     def _crt_frames(self, symbol, now):
         stamp = pd.Timestamp(now).floor("15min")
@@ -2526,6 +2590,10 @@ def main():
                         help="Disable the post-trade cooldown switch entirely")
     parser.add_argument("--win-cooldown-min", type=float, default=5.0,
                         help="Break after a winning trade, in minutes (default: 5)")
+    parser.add_argument("--session-sweep", action="store_true",
+                        help="Enable completed-session sweep/reclaim/M5 MSS trigger (research; default off)")
+    parser.add_argument("--session-liquidity-vault", default=SS.DEFAULT_VAULT,
+                        help="Read-only source of session ledger and CSV")
     parser.add_argument("--triggers", type=str, default=None,
                         help="Comma-separated trigger whitelist "
                              "(SWEEP_REJECTION,FVG_FILL,BOS_RETEST,JUDAS). "
@@ -2610,6 +2678,8 @@ def main():
         vplr_session_override= args.vplr_session_override,
         leg_conf_enabled     = args.leg_conf,
         leg_conf_mode        = args.leg_conf_mode,
+        session_sweep_enabled= args.session_sweep,
+        session_liquidity_vault=args.session_liquidity_vault,
         sweep_wick_filter    = args.sweep_wick_filter,
         sweep_wick_ratio     = args.sweep_wick_ratio,
         reclaim_fvg_enabled  = args.reclaim_fvg,

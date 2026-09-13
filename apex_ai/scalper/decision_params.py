@@ -66,6 +66,7 @@ EOD_HOUR_UTC = 23
 #: Per-trigger regime whitelist. Fading liquidity grabs is the MANIPULATION
 #: play, so SWEEP_REJECTION/JUDAS are whitelisted there rather than blocked.
 TRIGGER_REGIME_WHITELIST: Dict[str, FrozenSet[str]] = {
+    "SESSION_SWEEP": frozenset({"MANIPULATION", "ROTATION"}),
     "HTF_CRT_SWEEP": frozenset({"MANIPULATION", "ROTATION", "EXPANSION"}),
     "SWEEP_REJECTION": frozenset({"MANIPULATION", "ROTATION"}),
     "JUDAS":           frozenset({"MANIPULATION", "ROTATION"}),
@@ -186,12 +187,12 @@ STB_RANGE_GUARD_TRIGGERS = frozenset({"SWEEP_REJECTION", "JUDAS", "FVG_FILL"})
 #: Layer 3, NEUTRAL branch — triggers allowed through with no clear short-term
 #: read. A setup that does not need a directional bias to be valid.
 STB_NEUTRAL_OK_TRIGGERS = frozenset({"SWEEP_REJECTION", "JUDAS", "FVG_FILL",
-                                     "VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP"})
+                                     "VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP", "SESSION_SWEEP"})
 
 #: Layer 3, OPPOSING branch — triggers that are MEANT to trade against the
 #: prevailing short-term read. This is the set L-009 named as the blocker.
 STB_COUNTER_TREND_TRIGGERS = frozenset({"SWEEP_REJECTION",
-                                        "VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP"})
+                                        "VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP", "SESSION_SWEEP"})
 
 
 # ── H4 volume profile / value-area location gate ─────────────────────────────

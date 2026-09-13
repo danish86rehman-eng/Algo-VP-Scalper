@@ -3,6 +3,23 @@
 All notable changes to the APEX AI trading system. Timestamps are UTC.
 Newest first. Every entry states what changed, why, and how it was verified.
 
+## 2026-09-13 07:36 UTC — Add default-off completed-session sweep trigger
+
+- Added a feature-gated `SESSION_SWEEP` scalper trigger for completed Asia, London and New York
+  liquidity from the vault ledger. BSL raids may qualify only for bearish reversals and SSL raids
+  only for bullish reversals, after strict breach, reclaim, displaced M5 market-structure shift,
+  frozen-pivot chronology and an unconsumed opposing session-liquidity target. Two closes accepting
+  outside the level cancel the reversal. The entry must retain at least 2R gross and 1.5R after costs.
+- The live path validates the ledger generation, freshness, UTC timestamps and Exness account/server,
+  then revalidates the quote, account, costs and risk immediately before submission. A durable setup
+  reservation prevents retrying an uncertain order submission. Guardian keeps the structural target
+  fixed. Replay reconstructs the same levels causally from broker M1 bars instead of reading today's
+  ledger, and calls the same detector used by live code.
+- The trigger remains off unless `--session-sweep` is supplied. No live process was restarted and no
+  order was placed. Focused trigger tests pass; the chronological validation windows observed zero
+  trades in one fold and one losing trade in another, so evidence does not support live activation.
+  The longer training fold was invalid because MT5 returned no symbol metadata late in replay.
+
 ## 2026-09-09 11:48 UTC — Restore pre-September 7 scalper confidence behavior
 
 - Restored the demo-era confidence behavior requested by the operator: after the existing STB gate

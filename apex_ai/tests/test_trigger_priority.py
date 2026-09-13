@@ -52,4 +52,4 @@ class TriggerPriorityTests(unittest.TestCase):
             self.assertFalse(params["vplr_enabled"].default)
             self.assertFalse(params["va_fade_enabled"].default)
         self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS
-                               if t not in {"VP_LIQUIDITY_REACTION", "VALUE_AREA_FADE"}), self.ORDER)
+                               if t not in {"VP_LIQUIDITY_REACTION", "VALUE_AREA_FADE", "SESSION_SWEEP"}), self.ORDER)

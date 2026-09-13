@@ -476,11 +476,11 @@ class PriorityTests(unittest.TestCase):
     LEVEL = 4640.0
 
     def test_vp_is_next_after_sweep_and_htf_crt(self):
-        self.assertEqual(SATriggerEngine.ALL_TRIGGERS[2],
+        self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS if t != "SESSION_SWEEP")[2],
                          "VP_LIQUIDITY_REACTION")
 
     def test_remaining_relative_order_after_operator_promotion(self):
-        self.assertEqual(SATriggerEngine.ALL_TRIGGERS[3:],
+        self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS if t != "SESSION_SWEEP")[3:],
                          ("FVG_FILL", "BOS_RETEST",
                           "JUDAS", "VALUE_AREA_FADE"))
 
@@ -652,10 +652,10 @@ class STBMembershipTests(unittest.TestCase):
         self.assertEqual(DP.STB_RANGE_GUARD_TRIGGERS,
                          frozenset({"SWEEP_REJECTION", "JUDAS", "FVG_FILL"}))
         self.assertEqual(
-            DP.STB_NEUTRAL_OK_TRIGGERS - {"VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP"},
+            DP.STB_NEUTRAL_OK_TRIGGERS - {"VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP", "SESSION_SWEEP"},
             frozenset({"SWEEP_REJECTION", "JUDAS", "FVG_FILL"}))
         self.assertEqual(
-            DP.STB_COUNTER_TREND_TRIGGERS - {"VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP"},
+            DP.STB_COUNTER_TREND_TRIGGERS - {"VP_LIQUIDITY_REACTION", "HTF_CRT_SWEEP", "SESSION_SWEEP"},
             frozenset({"SWEEP_REJECTION"}))
 
     def test_gate1_has_a_whitelist_entry(self):

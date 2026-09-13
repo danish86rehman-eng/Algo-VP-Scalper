@@ -86,6 +86,7 @@ class SATrigger:
     htf_crt: object = None  # L-019 native D1/W1/MN1 raid evidence
     # L-017 closed-bar permission, also checked against the final order quote.
     reclaim: object = None
+    session_sweep: object = None  # Completed NY-clock session raid evidence
 
 
 def _wick_ratio(candle, direction: str) -> float:
@@ -109,7 +110,8 @@ def _wick_ratio(candle, direction: str) -> float:
     return wick / rng
 
 
-def resolve_enabled_triggers(requested, vplr_enabled: bool, crt_enabled: bool = True) -> List[str]:
+def resolve_enabled_triggers(requested, vplr_enabled: bool, crt_enabled: bool = True,
+                             session_sweep_enabled: bool = False) -> List[str]:
     """
     The enabled-trigger set, with VP_LIQUIDITY_REACTION added or removed by its
     own feature switch.
@@ -139,6 +141,12 @@ def resolve_enabled_triggers(requested, vplr_enabled: bool, crt_enabled: bool = 
         if requested is not None and "HTF_CRT_SWEEP" in names:
             raise ValueError("HTF_CRT_SWEEP requested while --no-htf-crt is set")
         names.discard("HTF_CRT_SWEEP")
+    if session_sweep_enabled:
+        names.add("SESSION_SWEEP")
+    else:
+        if requested is not None and "SESSION_SWEEP" in names:
+            raise ValueError("SESSION_SWEEP requires --session-sweep")
+        names.discard("SESSION_SWEEP")
     return sorted(names)
 
 
@@ -213,7 +221,7 @@ class SATriggerEngine:
     #: Mirrors the checks in step2_trigger, not the order of a CLI whitelist.
     #: Operator-approved 2026-09-07: Sweep first; remaining precedence intact.
     #: VP and value-area features remain disabled by default in decision_params.
-    ALL_TRIGGERS = ("SWEEP_REJECTION", "HTF_CRT_SWEEP", "VP_LIQUIDITY_REACTION", "FVG_FILL",
+    ALL_TRIGGERS = ("SESSION_SWEEP", "SWEEP_REJECTION", "HTF_CRT_SWEEP", "VP_LIQUIDITY_REACTION", "FVG_FILL",
                     "BOS_RETEST", "JUDAS", "VALUE_AREA_FADE")
 
     def __init__(self, equal_hl_tolerance_pct: float = 0.0003,
@@ -291,7 +299,8 @@ class SATriggerEngine:
                       profile=None,
                       edge_tolerance_frac: float = 0.10,
                       poc_band_frac: float = 0.10,
-                      vplr_ctx=None, m15_fvg_entry=None, htf_crt=None) -> SATrigger:
+                      vplr_ctx=None, m15_fvg_entry=None, htf_crt=None,
+                      session_sweep=None) -> SATrigger:
         """
         Check every enabled trigger, return the highest-priority one that fired.
 
@@ -312,6 +321,17 @@ class SATriggerEngine:
                 matched.append(trig.trigger_type)
                 if winner is None:
                     winner = trig
+
+        # Explicitly enabled named-session evidence precedes the local sweep.
+        # With the switch off, the existing priority order is unchanged.
+        if ("SESSION_SWEEP" in self.enabled_triggers and session_sweep is not None
+                and session_sweep.allow):
+            p = session_sweep
+            consider(SATrigger(
+                detected=True, trigger_type="SESSION_SWEEP", direction=p.direction,
+                entry_price=p.entry, stop_loss=p.stop, tp1=p.target, tp2=p.target,
+                confidence="MEDIUM", swept_level=p.swept_level, session_sweep=p,
+                description=f"{p.session} {p.side} raid/reclaim/M5 MSS at {p.pivot:.3f}"))
 
         # Operator-approved priority, shared by live and replay (2026-09-07).
         if "SWEEP_REJECTION" in self.enabled_triggers:
