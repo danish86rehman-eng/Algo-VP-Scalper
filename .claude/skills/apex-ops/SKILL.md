@@ -71,7 +71,7 @@ cd apex_ai && python maingpt.py
 Pool A spawns the Guardian as a child. Then, in a separate terminal:
 
 ```bash
-cd apex_ai && python scalper_agent.py --pool 1000 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0
+cd apex_ai && py -3.14 -E scalper_agent.py --pool 900 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH --sweep-location-config config.json --market-location-mode ACTIVE
 ```
 
 Confirm three scripts are up (Windows execution aliases show each as two PIDs

@@ -17,13 +17,18 @@ If any step fails  → SKIP (no override allowed)
 """
 from __future__ import annotations
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional, List, Tuple
 import pandas as pd
 import numpy as np
 
 from scalper.decision_params import (SWEEP_WICK_FILTER_ENABLED,
                                      SWEEP_WICK_RATIO_MIN)
+from scalper import decision_params as DP
+from scalper.location_permission import (
+    LocationPermissionConfig, MARKET_LOCATION_ACTIVE, MARKET_LOCATION_OFF,
+    M5_CONFIRMATION_NONE, build_location_permission,
+    evaluate_sweep_reaction, normalize_market_location_mode)
 
 logger = logging.getLogger("SA.Trigger")
 
@@ -87,6 +92,25 @@ class SATrigger:
     # L-017 closed-bar permission, also checked against the final order quote.
     reclaim: object = None
     session_sweep: object = None  # Completed NY-clock session raid evidence
+    #: Facts-only location context. Never read by selection or execution.
+    location_context: object = None
+    #: Authoritative VP + structural S/R market-location evidence. This is a
+    #: frozen snapshot used by the directional permission layer.
+    market_location: object = None
+    #: Normalized directional location permission and reaction evidence.
+    location_permission: object = None
+    #: Final pre-submit snapshots; signal fields above remain immutable.
+    final_location_context: object = None
+    final_location_permission: object = None
+    final_quote: object = None
+    signal_bid: Optional[float] = None
+    signal_ask: Optional[float] = None
+    signal_spread_pips: Optional[float] = None
+    signal_net_R: Optional[float] = None
+    reaction_state: str = "NO_REACTION"
+    confirmation_state: str = M5_CONFIRMATION_NONE
+    #: The completed trigger-frame candle that performed the liquidity raid.
+    sweep_time: object = None
 
 
 def _wick_ratio(candle, direction: str) -> float:
@@ -228,7 +252,8 @@ class SATriggerEngine:
                  tp1_r: float = None, tp2_r: float = None,
                  enabled_triggers=None,
                  sweep_wick_filter: bool = None,
-                 sweep_wick_ratio: float = None):
+                 sweep_wick_ratio: float = None,
+                 location_config: Optional[LocationPermissionConfig] = None):
         self.eq_tol = equal_hl_tolerance_pct
         self.tp1_r = float(tp1_r) if tp1_r is not None else self.TP1_R
         self.tp2_r = float(tp2_r) if tp2_r is not None else self.TP2_R
@@ -241,6 +266,16 @@ class SATriggerEngine:
         self.sweep_wick_ratio = (SWEEP_WICK_RATIO_MIN
                                  if sweep_wick_ratio is None
                                  else float(sweep_wick_ratio))
+        self.location_config = location_config or LocationPermissionConfig(
+            proximity_atr=DP.MARKET_LOCATION_PROXIMITY_ATR,
+            acceptance_buffer_atr=DP.MARKET_LOCATION_ACCEPTANCE_BUFFER_ATR,
+            m5_displacement_atr=DP.MARKET_LOCATION_M5_DISPLACEMENT_ATR,
+            m5_mss_lookback=DP.MARKET_LOCATION_M5_MSS_LOOKBACK,
+            m5_mss_swing_lookback=DP.MARKET_LOCATION_M5_MSS_SWING_LOOKBACK,
+            acceptance_bars=DP.MARKET_LOCATION_ACCEPTANCE_BARS,
+            sweep_expiry_minutes=DP.MARKET_LOCATION_SWEEP_EXPIRY_MINUTES,
+        )
+        self._frozen_sweep_locations = {}
         # `step2_trigger` returns the FIRST detector that fires, in a fixed
         # priority order with SWEEP_REJECTION at the head. That makes it
         # greedy: on the 2026-05-15 -> 08-21 window it took 196 of 198 trades
@@ -300,7 +335,12 @@ class SATriggerEngine:
                       edge_tolerance_frac: float = 0.10,
                       poc_band_frac: float = 0.10,
                       vplr_ctx=None, m15_fvg_entry=None, htf_crt=None,
-                      session_sweep=None) -> SATrigger:
+                      session_sweep=None, candidate_filter=None,
+                      candidate_observer=None, location_context_builder=None,
+                      sweep_location_active: bool = False,
+                      s01_result=None, market_location=None,
+                      market_location_mode: str = MARKET_LOCATION_OFF,
+                      market_location_required: Optional[bool] = None) -> SATrigger:
         """
         Check every enabled trigger, return the highest-priority one that fired.
 
@@ -314,10 +354,81 @@ class SATriggerEngine:
         """
         winner: Optional[SATrigger] = None
         matched: List[str] = []
+        if market_location_required is not None:
+            # Backwards-compatible adapter for callers while the public
+            # contract is now explicitly OFF/ACTIVE.
+            market_location_mode = (MARKET_LOCATION_ACTIVE
+                                    if market_location_required else MARKET_LOCATION_OFF)
+        market_location_mode = normalize_market_location_mode(market_location_mode)
 
         def consider(trig: Optional[SATrigger]) -> None:
             nonlocal winner
+            if trig is not None and trig.detected and candidate_filter is not None:
+                trig = candidate_filter(trig)
             if trig is not None and trig.detected:
+                if market_location is not None:
+                    trig.market_location = market_location
+                if (trig.trigger_type == "SWEEP_REJECTION"
+                        and location_context_builder is not None):
+                    try:
+                        trig.location_context = location_context_builder(trig)
+                    except Exception:
+                        # Observation must never change the trading decision.
+                        logger.exception("sweep location context failed")
+                location_binding = (
+                    market_location_mode == MARKET_LOCATION_ACTIVE
+                    and trig.trigger_type in DP.MARKET_LOCATION_ACTIVE_TRIGGERS)
+                if location_binding:
+                    freeze_key = (str(symbol).upper(), trig.direction,
+                                  str(trig.sweep_time), round(float(trig.swept_level or 0.0), 8))
+                    frozen = self._frozen_sweep_locations.get(freeze_key)
+                    permission = build_location_permission(
+                        market_location, direction=trig.direction,
+                        trigger_type=trig.trigger_type,
+                        swept_level=trig.swept_level,
+                        triggered_at=(getattr(market_location, "as_of", None)
+                                     if market_location is not None else None),
+                        frozen_location=frozen,
+                        config=self.location_config)
+                    permission = replace(permission,
+                                         market_location_mode=market_location_mode)
+                    if (trig.trigger_type == "SWEEP_REJECTION"
+                            and permission.executable):
+                        if frozen is None and permission.frozen is not None:
+                            self._frozen_sweep_locations[freeze_key] = permission.frozen
+                        permission = evaluate_sweep_reaction(
+                            permission, df_m1, sweep_time=trig.sweep_time,
+                            config=self.location_config)
+                    liquidity_identity = getattr(
+                        trig.location_context, "primary_liquidity_identity", None)
+                    if (liquidity_identity and liquidity_identity != "UNKNOWN_LOCAL"):
+                        permission = replace(
+                            permission,
+                            reasons=permission.reasons +
+                            (f"LIQUIDITY_{liquidity_identity}",))
+                    trig.location_permission = permission
+                    trig.reaction_state = permission.reaction_state
+                    trig.confirmation_state = permission.confirmation_state
+                # Observation hook only.  Its return value is deliberately
+                # ignored so telemetry cannot affect trigger selection.
+                if candidate_observer is not None:
+                    try:
+                        candidate_observer(trig)
+                    except Exception:
+                        logger.exception("candidate observer failed")
+                if (location_binding
+                        and getattr(trig.location_permission, "executable", False) is False):
+                    logger.info("%s location permission failed: %s",
+                                trig.trigger_type,
+                                getattr(trig.location_permission, "rejection_code", None)
+                                or getattr(trig.location_permission, "reason", "UNKNOWN"))
+                    return
+                if (trig.trigger_type == "SWEEP_REJECTION"
+                        and sweep_location_active
+                        and getattr(trig.location_context, "allowed", False) is False):
+                    logger.info("SWEEP_REJECTION liquidity permission failed: %s",
+                                getattr(trig.location_context, "permission_reason", "UNKNOWN"))
+                    return
                 matched.append(trig.trigger_type)
                 if winner is None:
                     winner = trig
@@ -384,6 +495,8 @@ class SATriggerEngine:
         if winner is None:
             return SATrigger()
         winner.matched_triggers = matched
+        if winner.location_context is not None:
+            winner.location_context = winner.location_context.with_matches(matched)
         return winner
 
     def _check_vp_liquidity_reaction(self, df_trigger: pd.DataFrame,
@@ -543,6 +656,70 @@ class SATriggerEngine:
 
         return True, "VALID"
 
+    def final_quote_check(self, trigger: SATrigger, *, bid: float, ask: float,
+                          point: float, symbol: str) -> dict:
+        """Validate the executable side of a final broker quote.
+
+        ``step3_validate`` remains the single source of the four geometry
+        limits.  This wrapper only supplies the actual BUY=ASK / SELL=BID
+        entry and exposes stable blocker codes for live and replay telemetry.
+        The caller keeps ``trigger.entry_price`` unchanged, so signal geometry
+        and fill geometry cannot be conflated.
+        """
+        result = {
+            "allowed": False,
+            "blocker": None,
+            "reason": "",
+            "executable_price": None,
+            "bid": float(bid),
+            "ask": float(ask),
+            "spread_pips": None,
+            "sl_pips": None,
+            "spread_to_stop": None,
+            "gross_reward_pips": None,
+            "round_turn_cost_pips": None,
+            "net_R": None,
+            "min_sl_pips": self.MIN_SL_PIPS.get(symbol, self.MIN_SL_PIPS["DEFAULT"]),
+        }
+        if point <= 0 or bid <= 0 or ask <= 0 or ask < bid:
+            result.update(blocker="FINAL_SPREAD_FAIL", reason="invalid executable quote")
+            return result
+        price = float(ask if trigger.direction == "BULLISH" else bid)
+        spread_pips = (float(ask) - float(bid)) / float(point) / 10.0
+        sl_pips = abs(price - float(trigger.stop_loss)) / float(point) / 10.0
+        gross_reward_pips = abs(float(trigger.tp1) - price) / float(point) / 10.0
+        round_turn = 2.0 * spread_pips
+        net_r = ((gross_reward_pips - round_turn) /
+                 (sl_pips + round_turn + 1e-10)) if sl_pips > 0 else None
+        result.update(
+            executable_price=price,
+            spread_pips=spread_pips,
+            sl_pips=sl_pips,
+            spread_to_stop=(spread_pips / sl_pips if sl_pips > 0 else None),
+            gross_reward_pips=gross_reward_pips,
+            round_turn_cost_pips=round_turn,
+            net_R=net_r,
+        )
+        quoted = replace(trigger, entry_price=price)
+        valid, reason = self.step3_validate(
+            quoted, spread_pips, symbol, sl_pips=sl_pips)
+        result["allowed"] = bool(valid)
+        result["reason"] = reason
+        if valid:
+            return result
+        if spread_pips > self._max_spread(symbol):
+            code = "FINAL_SPREAD_FAIL"
+        elif sl_pips > 0 and spread_pips / sl_pips > self.MAX_SPREAD_TO_SL_FRAC:
+            code = "FINAL_SPREAD_TO_STOP_FAIL"
+        elif sl_pips > 0 and sl_pips < result["min_sl_pips"]:
+            code = "FINAL_MIN_SL_FAIL"
+        elif net_r is not None and net_r < self.MIN_NET_R:
+            code = "FINAL_NET_R_FAIL"
+        else:
+            code = "FINAL_GEOMETRY_FAIL"
+        result["blocker"] = code
+        return result
+
     # ── Step 2 Trigger Detectors ──────────────────────────────────────────────
 
     def _check_sweep_rejection(self, df: pd.DataFrame, liq: MicroLiquidity,
@@ -575,6 +752,8 @@ class SATriggerEngine:
                 trig.tp1          = tp1
                 trig.tp2          = tp2
                 trig.swept_level  = ssl
+                trig.sweep_time = (recent.loc[recent['low'].idxmin(), 'time']
+                                   if 'time' in recent.columns else None)
                 trig.confidence   = "HIGH"
                 trig.description  = f"SSL {ssl:.4f} swept, bullish rejection confirmed"
                 return trig
@@ -597,6 +776,8 @@ class SATriggerEngine:
                 trig.tp1          = tp1
                 trig.tp2          = tp2
                 trig.swept_level  = bsl
+                trig.sweep_time = (recent.loc[recent['high'].idxmax(), 'time']
+                                   if 'time' in recent.columns else None)
                 trig.confidence   = "HIGH"
                 trig.description  = f"BSL {bsl:.4f} swept, bearish rejection confirmed"
                 return trig

@@ -564,6 +564,40 @@ LEG_CONF_MODE = "LVN_VETO"
 LEG_CONF_ENABLED = False
 
 
+# ── Authoritative VP + structural market-location permission -----------------
+# There are deliberately only two modes.  ACTIVE is binding only for the
+# trigger families listed below; OFF reproduces their legacy behaviour.
+MARKET_LOCATION_MODES = ("OFF", "ACTIVE")
+MARKET_LOCATION_MODE = "ACTIVE"
+MARKET_LOCATION_ACTIVE_TRIGGERS = frozenset({"SWEEP_REJECTION"})
+# Compatibility for older operational code; decision paths use MODE directly.
+MARKET_LOCATION_ENABLED = MARKET_LOCATION_MODE == "ACTIVE"
+MARKET_LOCATION_D1_BARS = 260
+MARKET_LOCATION_W1_BARS = 260
+MARKET_LOCATION_H4_BARS = 260
+MARKET_LOCATION_M15_BARS = 180
+# Detailed tick-volume reconstruction windows.  ACTIVE W1 normally fits in
+# the M15 window; H1 is the long-history fallback.  ACTIVE/REFERENCE H4 uses
+# M5 when complete and M15 otherwise.
+MARKET_LOCATION_VP_ROWS = 48
+MARKET_LOCATION_M15_DETAIL_BARS = 12_000
+MARKET_LOCATION_H1_DETAIL_BARS = 12_000
+MARKET_LOCATION_M5_DETAIL_BARS = 12_000
+MARKET_LOCATION_HISTORY_PATH = "logs/market_location_profiles.jsonl"
+MARKET_LOCATION_STATE_PATH = "logs/market_location_state.json"
+
+# Directional location permission.  All distances are ATR-normalised so the
+# same contract scales with XAUUSD volatility; live and replay import the same
+# values.
+MARKET_LOCATION_PROXIMITY_ATR = 0.35
+MARKET_LOCATION_ACCEPTANCE_BUFFER_ATR = 0.10
+MARKET_LOCATION_M5_DISPLACEMENT_ATR = 0.80
+MARKET_LOCATION_M5_MSS_LOOKBACK = 120
+MARKET_LOCATION_M5_MSS_SWING_LOOKBACK = 2
+MARKET_LOCATION_ACCEPTANCE_BARS = 2
+MARKET_LOCATION_SWEEP_EXPIRY_MINUTES = 120
+
+
 # ── Sweep-candle wick qualification (L-016) ──────────────────────────────────
 # `_check_sweep_rejection` admits a setup on two conditions only: any extreme in
 # the last 4 bars pierced the level, and the LAST bar closes back through it.

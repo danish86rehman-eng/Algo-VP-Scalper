@@ -131,8 +131,7 @@ python maingpt.py --config alt.json  # Use alternate config
 ### 3.2 Scalper Agent (Capital Pool B) — SA-V2
 ```powershell
 cd apex_ai
-python scalper_agent.py --pool 500 --risk 0.02 --symbols USOIL,XAUUSD,XAGUSD --interval 30 --loss-limit 50.0
-python scalper_agent.py --pool 500 --risk 0.02 --symbols USOIL,XAUUSD,XAGUSD --interval 30 --loss-limit 50.0 --dry-run
+py -3.14 -E scalper_agent.py --pool 900 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH --sweep-location-config config.json --market-location-mode ACTIVE
 
 # Cooldown switches (default: on)
 #   --no-cooldown              disable entirely
@@ -455,7 +454,7 @@ cd apex_ai
 python maingpt.py
 
 # 4. Launch scalper (separate terminal)
-python scalper_agent.py --pool 500 --risk 0.02 --symbols USOIL,XAUUSD,XAGUSD --interval 30 --loss-limit 50.0
+py -3.14 -E scalper_agent.py --pool 900 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH --sweep-location-config config.json --market-location-mode ACTIVE
 
 # 5. Verify all 3 processes are running
 Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" | Format-List ProcessId, CommandLine

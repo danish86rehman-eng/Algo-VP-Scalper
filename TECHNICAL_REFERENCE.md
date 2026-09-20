@@ -367,7 +367,7 @@ python maingpt.py
 
 ```bash
 # Pool B — every parameter is a flag
-python scalper_agent.py --pool 500 --risk 0.02 --symbols USOIL,XAUUSD,XAGUSD --interval 30 --loss-limit 50.0
+py -3.14 -E scalper_agent.py --pool 900 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH --sweep-location-config config.json --market-location-mode ACTIVE
 ```
 
 ```bash
@@ -610,7 +610,7 @@ cd apex_ai && python maingpt.py
 ```
 
 ```bash
-python scalper_agent.py --pool 500 --risk 0.02 --symbols USOIL,XAUUSD,XAGUSD --interval 30 --loss-limit 50.0
+py -3.14 -E scalper_agent.py --pool 900 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH --sweep-location-config config.json --market-location-mode ACTIVE
 ```
 
 Verify three scripts are up:

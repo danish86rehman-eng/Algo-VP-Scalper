@@ -3,6 +3,68 @@
 All notable changes to the APEX AI trading system. Timestamps are UTC.
 Newest first. Every entry states what changed, why, and how it was verified.
 
+## 2026-09-20 04:32 UTC — Reconcile SWEEP_REJECTION code and runtime document
+
+- Reconciled the technical document to the executable ACTIVE policy,
+  causal `0.10 ATR` pool match, final ASK/BID geometry checks, frozen
+  location/pool revalidation, and the approved non-dry-run DEMO command.
+- Updated the preferred XAUUSD DEMO launch profile for future starts to a
+  `$900` pool, `3%` risk, and `$100` daily loss limit while retaining FRESH
+  pool mode and the mandatory ACTIVE market-location policy.
+- Closed one contract gap found during the reconciliation: if an exact frozen
+  structural location disappears, a nearby replacement location ID now returns
+  `LOCATION_INVALIDATED` instead of preserving executable permission under the
+  old ID. Risk, sizing, targets, sessions, cooldown, Guardian, news, trigger
+  priority, wick filtering, base detection, and M5 thresholds are unchanged.
+- Verification: 90 focused reconciliation tests and all 681 repository tests
+  pass; `py -3.14 -E -m compileall -q .` and `git diff --check` pass.
+
+## 2026-09-20 04:20 UTC — Complete SWEEP_REJECTION runtime contract
+
+- Made ACTIVE named-liquidity policy mandatory whenever `SWEEP_REJECTION` is
+  enabled. Startup now logs the resolved policy path, allowed families, and
+  `ALLOW_UNKNOWN_LOCAL` / `ALLOW_CONSUMED` safety flags; missing or inactive
+  configuration fails closed.
+- Replaced exact-number pool matching with causal, pre-event ATR-normalized
+  matching and added future/self-pool, consumed-pool, stable candidate-ID, and
+  named-pool telemetry guarantees. The base detector, wick policy, priority,
+  confidence, and 2R/3R targets were not changed.
+- Added live/replay final frozen-location checks and executable quote geometry:
+  BUY uses ASK, SELL uses BID, with explicit `FINAL_SPREAD_FAIL`,
+  `FINAL_SPREAD_TO_STOP_FAIL`, `FINAL_MIN_SL_FAIL`, and `FINAL_NET_R_FAIL`
+  blockers. Signal and fill telemetry remain separate.
+- Verification: 20 focused runtime-contract tests and 678 full-suite tests
+  pass; `py -3.14 -E -m compileall -q .` and `git diff --check` pass. The
+  XAUUSD DEMO process is running with `--pool-mode FRESH`, ACTIVE location
+  policy, no `--dry-run`, and no manual order; it is waiting for a genuine
+  candidate.
+
+## 2026-09-20 02:53 UTC — Correct active-auction Volume Profile anchors
+
+- Replaced score-first W1/H4 ACTIVE selection with current-structure auction
+  discovery. Historical score-ranked legs remain separately addressable
+  REFERENCE profiles and no longer supply the active location gate.
+- Resolved same-candle dual pivots deterministically, separated anchor endpoint
+  prices from internal profile extremes, and added frozen ACTIVE/REFERENCE/
+  RETIRED lifecycle telemetry with stable profile IDs.
+- Reconstructed W1 profiles from complete M15 tick volume (H1/native fallback)
+  and H4 profiles from complete M5 tick volume (M15/native fallback), clipped
+  to the anchor interval with a configured 48-row policy and volume checksum.
+- Broker-dataset validation independently selected W1 3942.204→4697.232 and
+  H4 4235.035→4399.826, matching the approved audit's detailed POC/VAH/VAL
+  targets. Verification: 658 tests pass, `compileall` passes, and
+  `git diff --check` is clean (line-ending warnings only).
+
+## 2026-09-19 14:34 UTC — Activate top-down market location for sweep rejection
+
+- Replaced the ambiguous location switch with the explicit `OFF`/`ACTIVE`
+  contract. `ACTIVE` is binding only for `SWEEP_REJECTION`; other trigger
+  families retain their own strategy contracts. Live and replay now pass the
+  same mode, W1/H4 engine, permission rules, and reaction confirmation path.
+- Preserved separate W1 macro and H4 local anchored profiles, added complete
+  per-timeframe ATR-distance telemetry, immutable sweep-location association,
+  explicit acceptance/expiry rejection reasons, and checksummed atomic profile
+  state. Profile lifecycle keys are symbol-scoped.
 ## 2026-09-13 07:36 UTC — Add default-off completed-session sweep trigger
 
 - Added a feature-gated `SESSION_SWEEP` scalper trigger for completed Asia, London and New York

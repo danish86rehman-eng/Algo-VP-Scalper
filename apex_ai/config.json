@@ -65,5 +65,20 @@
     "monte_carlo_runs": 500,
     "min_win_prob_to_trade": 0.52
   },
-  "dry_run": false
+  "dry_run": false,
+  "sweep_location": {
+    "enabled": true,
+    "mode": "active",
+    "allow": {
+      "previous_week": true,
+      "previous_day": true,
+      "session_liquidity": true,
+      "h4_swing": true,
+      "h1_swing": true,
+      "m15_equal_liquidity": true
+    },
+    "match_tolerance_atr": 0.10,
+    "allow_unknown_local": false,
+    "allow_consumed": false
+  }
 }

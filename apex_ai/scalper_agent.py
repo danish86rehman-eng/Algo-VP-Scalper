@@ -78,6 +78,12 @@ logger = logging.getLogger("SA")
 # ── SA Module Imports ─────────────────────────────────────────────────────────
 from scalper.capital_pool    import SACapitalPool
 from scalper.session_checker import SASessionChecker
+from scalper.candidate_funnel import (CandidateFunnelRecorder,
+                                       candidate_id_for_trigger,
+                                       make_candidate_id)
+from scalper.sweep_location import (SweepLocationPolicy,
+                                     build_sweep_location_context,
+                                     load_sweep_location_policy)
 from scalper.vp_liquidity_trigger import (
     VPLRParams,
     build_context as vplr_context,
@@ -119,6 +125,30 @@ def _vplr_record(trigger) -> Optional[dict]:
     }
 
 
+def _market_location_record(trigger) -> Optional[dict]:
+    """Serialize the shared location snapshot for entry telemetry/journals."""
+    snapshot = getattr(trigger, "market_location", None)
+    if snapshot is None or not hasattr(snapshot, "record"):
+        return None
+    try:
+        return snapshot.record()
+    except Exception:
+        logger.exception("SA: market-location telemetry serialization failed")
+        return None
+
+
+def _location_permission_record(trigger) -> Optional[dict]:
+    """Serialize the normalized location/reaction permission."""
+    permission = getattr(trigger, "location_permission", None)
+    if permission is None or not hasattr(permission, "record"):
+        return None
+    try:
+        return permission.record()
+    except Exception:
+        logger.exception("SA: location-permission telemetry serialization failed")
+        return None
+
+
 from scalper.trigger_engine  import SATriggerEngine, resolve_enabled_triggers
 from scalper.sa_crg          import SACRG
 from scalper.behavior_state  import SABehaviorStateMachine, SAState
@@ -134,7 +164,10 @@ from scalper.htf_crt         import watch_crt, select_crt, used_setups, crt_quot
 from scalper import session_sweep as SS
 from scalper.ema_filter      import EMABandFilter  # H1 EMA(18) high/low band
 from scalper.leg_confluence  import (MODES as LEG_CONF_MODES, build_leg_pair,
-                                     evaluate as leg_conf_evaluate)
+                                      evaluate as leg_conf_evaluate)
+from scalper.market_location import MarketLocationConfig, MarketLocationEngine
+from scalper.location_permission import (build_location_permission,
+                                          evaluate_sweep_reaction)
 from scalper.vp_gate         import MODES as VP_MODES, VolumeProfileGate
 from scalper.regime_classifier import RegimeClassifier  # trending vs ranging
 from scalper.regime_direction_gate import (
@@ -299,12 +332,15 @@ class ScalperAgent:
                  vplr_session_override: bool = DP.VPLR_SESSION_OVERRIDE_ENABLED,
                  pool_mode: str = "RESUME",
                  session_sweep_enabled: bool = False,
-                 session_liquidity_vault: str = SS.DEFAULT_VAULT):
+                 session_liquidity_vault: str = SS.DEFAULT_VAULT,
+                 sweep_location_policy: Optional[SweepLocationPolicy] = None,
+                 market_location_mode: str = DP.MARKET_LOCATION_MODE):
         self.symbols    = symbols
         self.interval   = interval
         self.dry_run    = dry_run
         self.session_sweep_enabled = session_sweep_enabled
         self.session_liquidity_vault = session_liquidity_vault
+        self.sweep_location_policy = sweep_location_policy or SweepLocationPolicy()
         self._session_sweep_attempt_dir = Path(__file__).parent / "data/session_sweep_attempts"
         self.reclaim_fvg_enabled = reclaim_fvg_enabled
         self.m15_fvg_entry_enabled = m15_fvg_entry_enabled
@@ -377,10 +413,21 @@ class ScalperAgent:
         # measurement. `step2_trigger` returns the first detector that fires,
         # so SWEEP_REJECTION at the head of the priority order masks every
         # trigger behind it. Mirrored in backtest_scalper.py (invariant #2).
+        resolved_triggers = resolve_enabled_triggers(
+            enabled_triggers, self.vplr_enabled, htf_crt_enabled,
+            session_sweep_enabled)
+        if "SWEEP_REJECTION" in resolved_triggers:
+            requested_market_location_mode = str(market_location_mode).upper()
+            if requested_market_location_mode != "ACTIVE":
+                raise ValueError(
+                    "SWEEP_REJECTION requires --market-location-mode ACTIVE; "
+                    "location gating cannot silently be disabled")
+            if not self.sweep_location_policy.active:
+                raise ValueError(
+                    "SWEEP_REJECTION requires an ACTIVE sweep-location policy; "
+                    "pass --sweep-location-config config.json")
         self.trigger_eng = SATriggerEngine(
-            enabled_triggers=resolve_enabled_triggers(enabled_triggers,
-                                                      self.vplr_enabled, htf_crt_enabled,
-                                                      session_sweep_enabled),
+            enabled_triggers=resolved_triggers,
             sweep_wick_filter=sweep_wick_filter,
             sweep_wick_ratio=sweep_wick_ratio)
         self.state_mach  = SABehaviorStateMachine()
@@ -433,6 +480,23 @@ class ScalperAgent:
                 er_threshold    = DP.VP_REGIME_ER_THRESHOLD,
             ),
         )
+        # Shared causal VP + structural S/R evidence.  The trigger engine
+        # consumes this frozen snapshot through the location-permission layer;
+        # it does not alter risk, geometry, or broker execution.
+        self.market_location_mode = str(market_location_mode).upper()
+        if self.market_location_mode not in DP.MARKET_LOCATION_MODES:
+            raise ValueError("market_location_mode must be OFF or ACTIVE")
+        self.market_location_enabled = self.market_location_mode == "ACTIVE"
+        self.market_location = MarketLocationEngine(
+            config=MarketLocationConfig(
+                profile_target_bins=DP.MARKET_LOCATION_VP_ROWS),
+            history_path=(DP.MARKET_LOCATION_HISTORY_PATH
+                          if self.market_location_enabled else None),
+            state_path=(DP.MARKET_LOCATION_STATE_PATH
+                        if self.market_location_enabled else None))
+        logger.info("MARKET_LOCATION_MODE=%s SWEEP_REJECTION binding_triggers=%s",
+                    self.market_location_mode,
+                    sorted(DP.MARKET_LOCATION_ACTIVE_TRIGGERS))
         self.cooldown    = SACooldown(
             win_minutes=win_cooldown_minutes,
             loss_policy=loss_cooldown_policy,
@@ -449,6 +513,9 @@ class ScalperAgent:
         # non-decisional.
         self.rejects = RejectionLog("logs/sa_rejections.json")
         self.incidents = PMORTEM.IncidentJournal("logs/sa_incidents.jsonl")
+        # Observation only: this recorder has no authority over trigger
+        # selection, gates, sizing, or order submission.
+        self.candidate_funnel = CandidateFunnelRecorder("logs/sa_candidate_funnel.jsonl")
         try:
             self.execution_telemetry = EXEC_TEL.DatagramTelemetryClient()
         except Exception as e:
@@ -487,6 +554,16 @@ class ScalperAgent:
                     "VALUE_AREA_FADE=%s | Era=%s",
                     " > ".join(priority), self.vplr_enabled,
                     self.va_fade_enabled, DP.CONFIG_ERA)
+        logger.info(
+            "SWEEP_LOCATION_POLICY=%s CONFIG_PATH=%s ALLOW_UNKNOWN_LOCAL=%s "
+            "ALLOW_CONSUMED=%s MATCH_TOLERANCE_ATR=%.4f",
+            "ACTIVE" if self.sweep_location_policy.active else "OFF",
+            self.sweep_location_policy.config_path or "<none>",
+            self.sweep_location_policy.allow_unknown_local,
+            self.sweep_location_policy.allow_consumed,
+            self.sweep_location_policy.match_tolerance_atr)
+        logger.info("SWEEP_LOCATION_ALLOWED_FAMILIES=%s",
+                    ",".join(self.sweep_location_policy.allowed_families) or "NONE")
         logger.info(
             f"\n"
             f"{'='*60}\n"
@@ -668,13 +745,46 @@ class ScalperAgent:
         session_open = self._session_open_prices.get(symbol)
 
         # Step 2: Trigger Detection
-        # The H4 profile is built once per scan when any consumer needs it:
-        # the VALUE_AREA_FADE trigger below, and the VP gate further down.
+        # The H4 profile is fetched once for the legacy VP consumers and the
+        # shared market-location engine. ACTIVE is binding only for the
+        # configured trigger families; other trigger contracts are unchanged.
         vp_profile = None
-        if self.va_fade_enabled or self.vp_gate_enabled:
-            df_h4_vp = self._get_ohlcv(symbol, DP.VP_PROFILE_TF,
-                                       bars=DP.VP_PROFILE_FETCH_BARS)
-            vp_profile = self.vp_gate.build_profile(df_h4_vp)
+        df_h4_vp = None
+        market_location = None
+        market_location_enabled = getattr(self, "market_location_enabled", False)
+        if (self.va_fade_enabled or self.vp_gate_enabled
+                or market_location_enabled):
+            df_h4_vp = self._get_ohlcv(
+                symbol, DP.VP_PROFILE_TF,
+                bars=max(DP.VP_PROFILE_FETCH_BARS,
+                         DP.MARKET_LOCATION_H4_BARS))
+            if self.va_fade_enabled or self.vp_gate_enabled:
+                vp_profile = self.vp_gate.build_profile(df_h4_vp)
+        if market_location_enabled and getattr(self, "market_location", None) is not None:
+            df_w1_location = self._get_ohlcv(
+                symbol, mt5.TIMEFRAME_W1, bars=DP.MARKET_LOCATION_W1_BARS)
+            df_d1_location = self._get_ohlcv(
+                symbol, mt5.TIMEFRAME_D1, bars=DP.MARKET_LOCATION_D1_BARS)
+            df_m15_location = self._get_ohlcv(
+                symbol, mt5.TIMEFRAME_M15,
+                bars=DP.MARKET_LOCATION_M15_DETAIL_BARS)
+            df_h1_location = self._get_ohlcv(
+                symbol, mt5.TIMEFRAME_H1,
+                bars=DP.MARKET_LOCATION_H1_DETAIL_BARS)
+            df_m5_location = self._get_ohlcv(
+                symbol, mt5.TIMEFRAME_M5,
+                bars=DP.MARKET_LOCATION_M5_DETAIL_BARS)
+            market_location = self.market_location.snapshot(
+                symbol=symbol,
+                current_price=float(df_m5["close"].iloc[-1]),
+                df_w1=df_w1_location,
+                df_d1=df_d1_location,
+                df_h4=df_h4_vp,
+                df_m15=df_m15_location,
+                df_h1=df_h1_location,
+                df_m5=df_m5_location,
+                as_of=now,
+            )
 
         # ── VP_LEG_CONFLUENCE legs (L-015) ──────────────────────────────────
         # Two COMPLETED H4 swing legs, built once per scan before any trigger
@@ -748,6 +858,7 @@ class ScalperAgent:
         if vp_only:
             saved = self.trigger_eng.enabled_triggers
             self.trigger_eng.enabled_triggers = {"VP_LIQUIDITY_REACTION"}
+        funnel_seen = []
         try:
             trigger = self.trigger_eng.step2_trigger(
                 df_m5, df_m1, liq, symbol, session_open,
@@ -756,12 +867,38 @@ class ScalperAgent:
                 poc_band_frac=DP.VP_POC_BAND_FRAC,
                 vplr_ctx=vplr_ctx, m15_fvg_entry=m15_fvg_plan,
                 htf_crt=self._crt_candidate(symbol, df_m5, df_m1, now) if not vp_only else None,
-                session_sweep=session_sweep_plan)
+                session_sweep=session_sweep_plan,
+                candidate_observer=funnel_seen.append,
+                market_location=market_location,
+                market_location_mode=getattr(self, "market_location_mode", "OFF"),
+                sweep_location_active=getattr(self, "sweep_location_policy", SweepLocationPolicy()).active,
+                location_context_builder=(lambda t: build_sweep_location_context(
+                    symbol=symbol, trigger=t, df_trigger=df_m5, liquidity=liq,
+                    now=now, df_d1=self._get_ohlcv(symbol, DP.PDR_TF, bars=DP.PDR_BARS),
+                    df_h1=self._get_ohlcv(symbol, self.TF_H1, bars=120),
+                    df_h4=self._get_ohlcv(symbol, self.TF_H4, bars=120),
+                    df_w1=self._get_ohlcv(symbol, mt5.TIMEFRAME_W1, bars=20),
+                    session_tracker=self.stb_filter.liq_tracker,
+                    vp_profile=vp_profile, m15_fvg=m15_fvg_plan,
+                    policy=getattr(self, "sweep_location_policy", SweepLocationPolicy()),
+                    point=getattr(mt5.symbol_info(symbol), "point", None))))
         finally:
             if vp_only:
                 self.trigger_eng.enabled_triggers = saved
 
         if not trigger.detected:
+            funnel_recorder = getattr(self, "candidate_funnel", None)
+            if funnel_recorder is not None and funnel_seen:
+                completed_bar = df_m5['time'].iloc[-1] if 'time' in df_m5.columns else None
+                funnel_ids = [(t, funnel_recorder.observe_trigger(
+                    t, symbol, completed_bar, now)) for t in funnel_seen]
+                for observed, cid in funnel_ids:
+                    if cid:
+                        funnel_recorder.record_location_result(
+                            cid, observed, completed_bar, now)
+                funnel_recorder.record_selection(
+                    funnel_ids, trigger, completed_bar_ts=completed_bar,
+                    evaluation_ts=now)
             reason = ""
             if vplr_ctx is not None and getattr(trigger, "vplr", None) is None:
                 # Record why the VP chain stopped, so the funnel is countable
@@ -770,6 +907,54 @@ class ScalperAgent:
                 reason = f"VPLR: {probe.reject_reason}"
             self.rejects.record("NO_TRIGGER", symbol, reason, now)
             return
+
+        completed_bar = df_m5['time'].iloc[-1] if 'time' in df_m5.columns else None
+        trigger.decision_time = now
+        trigger.candidate_id = candidate_id_for_trigger(symbol, trigger,
+                                                         completed_bar)
+
+        # Observation only: capture all fired detectors and mark lower-
+        # priority overlaps as pre-empted.  The observer's return value is not
+        # used by the trading path.
+        funnel_recorder = getattr(self, "candidate_funnel", None)
+        funnel_ids = ([(t, funnel_recorder.observe_trigger(
+            t, symbol, completed_bar, now)) for t in funnel_seen]
+                      if funnel_recorder is not None else [])
+        selected_id = next((cid for t, cid in funnel_ids if t is trigger), None)
+        if selected_id:
+            funnel_recorder.record_selection(
+                funnel_ids, trigger, completed_bar_ts=completed_bar,
+                evaluation_ts=now)
+            for observed, cid in funnel_ids:
+                if cid:
+                    funnel_recorder.record_location_result(
+                        cid, observed, completed_bar, now)
+            funnel_recorder.stage(
+                selected_id, "SESSION_CHECKED", "PASS",
+                "scan passed session window", completed_bar_ts=completed_bar,
+                evaluation_ts=now, source_timeframes=("M15", "M5"))
+            for other, cid in funnel_ids:
+                if cid and other is not trigger:
+                    permission = getattr(other, "location_permission", None)
+                    if permission is not None and not getattr(permission, "executable", False):
+                        continue
+                    funnel_recorder.preempt(cid, selected_id, trigger.trigger_type)
+
+        def funnel_terminal(reason: str, status: str = "REJECTED",
+                            values: Optional[dict] = None) -> None:
+            """Record-only lifecycle closure for the selected candidate."""
+            if selected_id and funnel_recorder is not None:
+                funnel_recorder.terminal(
+                    selected_id, status, reason,
+                    values=values or self._sweep_runtime_record(trigger))
+
+        def funnel_stage(stage: str, reason: str = "") -> None:
+            """Record-only stage marker; never feeds back into execution."""
+            if selected_id and funnel_recorder is not None:
+                funnel_recorder.stage(selected_id, stage, "PASS", reason,
+                                      completed_bar_ts=completed_bar,
+                                      evaluation_ts=now,
+                                      source_timeframes=("M15", "M5"))
 
         analysis_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt or trigger.session_sweep) else
                           float(df_m5['close'].iloc[-1]))
@@ -788,10 +973,12 @@ class ScalperAgent:
             if not self._reclaim_history_ready:
                 self.rejects.record("RECLAIM_HISTORY_UNAVAILABLE", symbol,
                                     "cannot restore prior-entry barrier", now)
+                funnel_terminal("RECLAIM_HISTORY_UNAVAILABLE")
                 return
             gate_tick = mt5.symbol_info_tick(symbol)
             if gate_tick is None:
                 self.rejects.record("RECLAIM_NO_QUOTE", symbol, "no quote", now)
+                funnel_terminal("RECLAIM_NO_QUOTE")
                 return
             quote = gate_tick.ask if trigger.direction == "BULLISH" else gate_tick.bid
             trigger.reclaim = evaluate_reclaim(
@@ -804,7 +991,9 @@ class ScalperAgent:
             if not decision.allow:
                 self.rejects.record(decision.reason, symbol,
                                     f"level={decision.level} {decision.record()}", now)
+                funnel_terminal(decision.reason)
                 return
+            funnel_stage("STRUCTURE_CHECKED", "reclaim passed")
 
         # ── H1 EMA(18) high/low band — directional permission ────────────────
         # Longs only while price is above both bands, shorts only while below
@@ -828,6 +1017,7 @@ class ScalperAgent:
                     f"{trigger.trigger_type} — {band.reason}"
                 )
                 self.rejects.record("EMA_BAND", symbol, band.reason, now)
+                funnel_terminal("EMA_BAND")
                 return
             logger.info(f"SA {symbol}: EMA BAND passed — {band.reason}")
 
@@ -854,6 +1044,7 @@ class ScalperAgent:
                     f"{trigger.trigger_type} — {pdr.reason}"
                 )
                 self.rejects.record("PDR_GATE", symbol, pdr.reason, now)
+                funnel_terminal("PDR_GATE")
                 return
             logger.info(f"SA {symbol}: PDR GATE passed — {pdr.reason}")
 
@@ -870,6 +1061,7 @@ class ScalperAgent:
                     f"{trigger.trigger_type} — {rd.reason}"
                 )
                 self.rejects.record("RD_GATE", symbol, rd.reason, now)
+                funnel_terminal("RD_GATE")
                 return
 
         # ── H4 value-area location gate ──────────────────────────────────────
@@ -897,6 +1089,7 @@ class ScalperAgent:
                     f"{trigger.trigger_type} — {vp.reason}"
                 )
                 self.rejects.record("VP_GATE", symbol, vp.reason, now)
+                funnel_terminal("VP_GATE")
                 return
             if vp.abstained:
                 logger.debug(f"SA {symbol}: VP GATE abstained — {vp.reason}")
@@ -916,6 +1109,7 @@ class ScalperAgent:
                     f"SA {symbol}: LEG CONFLUENCE blocked {trigger.direction} "
                     f"{trigger.trigger_type} — {lc.label} [{lc.pair_summary}]")
                 self.rejects.record(lc.reason(), symbol, lc.label, now)
+                funnel_terminal(lc.reason())
                 return
             logger.info(
                 f"SA {symbol}: LEG CONFLUENCE passed — {lc.label} "
@@ -948,7 +1142,9 @@ class ScalperAgent:
                 f"short_term={stb.short_term_bias} htf={stb.htf_trend}{sweep_str}"
             )
             self.rejects.record("STB", symbol, stb.reason, now)
+            funnel_terminal("STB")
             return
+        funnel_stage("STB_CHECKED", "short-term bias passed")
         sweep_str = f" | sweep={stb.recent_sweep}" if stb.recent_sweep else ""
         logger.info(
             f"SA {symbol}: STB GATE passed [{stb.confidence}] — {stb.reason} | "
@@ -960,6 +1156,7 @@ class ScalperAgent:
                       f"trigger={trigger.confidence} STB={stb.confidence}")
             logger.info(f"SA {symbol}: CONFIDENCE BLOCKED — {reason}")
             self.rejects.record("CONFIDENCE", symbol, reason, now)
+            funnel_terminal("CONFIDENCE")
             return
 
         # Thin-liquidity filter — require HIGH STB confidence during
@@ -977,6 +1174,7 @@ class ScalperAgent:
                 "THIN_LIQ", symbol,
                 f"hour {utc_hour:02d} needs {self.THIN_LIQ_REQUIRED_CONFIDENCE}, "
                 f"got {stb.confidence}", now)
+            funnel_terminal("THIN_LIQ")
             return
 
         # ── SA Consultant Gates (Institutional Intelligence) ──────────────────
@@ -998,6 +1196,7 @@ class ScalperAgent:
                 f"Safe fallback = skip trade."
             )
             self.rejects.record("CONSULT_UNAVAILABLE", symbol, consult.reason, now)
+            funnel_terminal("CONSULT_UNAVAILABLE")
             return
 
         if consult.stale_data:
@@ -1006,6 +1205,7 @@ class ScalperAgent:
                 f"Safe fallback = skip trade."
             )
             self.rejects.record("CONSULT_STALE", symbol, "snapshot >60s", now)
+            funnel_terminal("CONSULT_STALE")
             return
 
         if consult.latency_ms > self.CONSULT_MAX_LATENCY_MS:
@@ -1016,6 +1216,7 @@ class ScalperAgent:
             self.rejects.record(
                 "CONSULT_LATENCY", symbol,
                 f"{consult.latency_ms:.0f}ms over budget", now)
+            funnel_terminal("CONSULT_LATENCY")
             return
 
         if consult.success:
@@ -1034,6 +1235,7 @@ class ScalperAgent:
                 )
                 self.rejects.record("GATE1_REGIME", symbol,
                                     "STRESS rejects all triggers", now)
+                funnel_terminal("GATE1_REGIME")
                 return
 
             allowed = self.TRIGGER_REGIME_WHITELIST.get(trigger.trigger_type)
@@ -1045,6 +1247,7 @@ class ScalperAgent:
                 self.rejects.record(
                     "GATE1_REGIME", symbol,
                     f"{trigger.trigger_type} has no whitelist", now)
+                funnel_terminal("GATE1_REGIME")
                 return
             if consult.regime not in allowed:
                 logger.info(
@@ -1054,7 +1257,9 @@ class ScalperAgent:
                 self.rejects.record(
                     "GATE1_REGIME", symbol,
                     f"{consult.regime} unsuitable for {trigger.trigger_type}", now)
+                funnel_terminal("GATE1_REGIME")
                 return
+            funnel_stage("REGIME_CHECKED", "consultation regime passed")
             logger.info(
                 f"SA {symbol}: CONSUL Gate 1 passed | Regime={consult.regime} "
                 f"matches {trigger.trigger_type}"
@@ -1068,6 +1273,7 @@ class ScalperAgent:
                 )
                 self.rejects.record("GATE2_DISPLACEMENT", symbol,
                                     "no institutional displacement", now)
+                funnel_terminal("GATE2_DISPLACEMENT")
                 return
 
             # Gate 3 — LIA TP2 Override
@@ -1081,6 +1287,7 @@ class ScalperAgent:
         tick = mt5.symbol_info_tick(symbol)
         info = mt5.symbol_info(symbol)
         if not tick or not info:
+            funnel_terminal("EXECUTION_QUOTE_UNAVAILABLE")
             return
         spread_pips = (tick.ask - tick.bid) / info.point / 10
         sl_pips_for_check = abs(trigger.entry_price - trigger.stop_loss) / info.point / 10
@@ -1094,7 +1301,19 @@ class ScalperAgent:
                 f"dir={trigger.direction}"
             )
             self.rejects.record("STEP3_VALIDATE", symbol, reason, now)
+            funnel_terminal("COST_CHECKED")
             return
+        trigger.signal_bid = float(tick.bid)
+        trigger.signal_ask = float(tick.ask)
+        trigger.signal_spread_pips = float(spread_pips)
+        signal_risk = abs(float(trigger.entry_price) - float(trigger.stop_loss))
+        signal_reward = abs(float(trigger.tp1) - float(trigger.entry_price)) / info.point / 10.0
+        signal_sl_pips = signal_risk / info.point / 10.0
+        trigger.signal_net_R = (
+            (signal_reward - 2.0 * spread_pips) /
+            (signal_sl_pips + 2.0 * spread_pips + 1e-10)
+            if signal_sl_pips > 0 else None)
+        funnel_stage("COST_CHECKED", "spread and geometry passed")
 
         blackout = self.news_guard.active_blackout(now_utc=now, symbol=symbol)
         if blackout:
@@ -1119,7 +1338,9 @@ class ScalperAgent:
         if not crg_decision.approved:
             logger.info(f"SA {symbol}: CRG BLOCKED — {crg_decision.blocked_reason}")
             self.rejects.record("CRG", symbol, crg_decision.blocked_reason, now)
+            funnel_terminal("CRG")
             return
+        funnel_stage("RISK_CHECKED", "SA-CRG approved")
 
         # Execute (or dry-run)
         lot_size = self._calculate_lots(symbol, trigger)
@@ -1130,6 +1351,7 @@ class ScalperAgent:
             )
             self.rejects.record("LOT_FLOOR", symbol,
                                 f"lots={lot_size} below broker minimum", now)
+            funnel_terminal("LOT_FLOOR")
             return
 
         logger.info(
@@ -1158,6 +1380,7 @@ class ScalperAgent:
         if not ticket:
             self.rejects.record("EXECUTE_FAIL", symbol,
                                 "broker did not return a ticket", now)
+            funnel_terminal("EXECUTE_FAIL", values=self._sweep_runtime_record(trigger))
         if ticket:
             self.pool.register_open()
             self._open_trades[ticket] = {
@@ -1172,6 +1395,9 @@ class ScalperAgent:
                 # Context captured at entry so the close handler can journal a
                 # complete record without re-deriving market state.
                 "trigger_type": trigger.trigger_type,
+                "candidate_id": (candidate_id_for_trigger(
+                    symbol, trigger, df_m5["time"].iloc[-1])
+                    if trigger.trigger_type == "SWEEP_REJECTION" else None),
                 "matched_triggers": list(trigger.matched_triggers),
                 "confidence": trigger.confidence,
                 # Gate state as it stood at entry. `stb` is already in scope
@@ -1189,7 +1415,22 @@ class ScalperAgent:
                 # IDLE there, which is true of the normal windows and useless
                 # for attributing the trade.
                 "session": self.session.vp_window_name(now),
-                "vplr": _vplr_record(trigger),
+                 "vplr": _vplr_record(trigger),
+                 "market_location": _market_location_record(trigger),
+                 "location_permission": _location_permission_record(trigger),
+                 "final_location_context": (
+                     trigger.final_location_context.record()
+                     if getattr(trigger, "final_location_context", None) is not None
+                     else None),
+                 "final_location_permission": (
+                     trigger.final_location_permission.record()
+                     if getattr(trigger, "final_location_permission", None) is not None
+                     else None),
+                 "sweep_runtime_contract": self._sweep_runtime_record(trigger),
+                 "reaction_state": getattr(trigger, "reaction_state", "NO_REACTION"),
+                 "confirmation_state": getattr(trigger, "confirmation_state", "NONE"),
+                 "s01": (trigger.s01.record()
+                         if getattr(trigger, "s01", None) is not None else None),
                 "reclaim": trigger.reclaim.record() if trigger.reclaim else None,
                 "m15_fvg": trigger.fvg_entry.record() if trigger.fvg_entry else None,
                 "htf_crt": trigger.htf_crt.record() if trigger.htf_crt else None,
@@ -1206,6 +1447,8 @@ class ScalperAgent:
                 "execution": getattr(self, "_entry_execution", {}).pop(ticket, {}),
             }
             self._log_trade(symbol, trigger, sess, lot_size, ticket)
+            funnel_terminal("order accepted", "EXECUTED",
+                            values=self._sweep_runtime_record(trigger))
 
     # ── Trade Execution ───────────────────────────────────────────────────────
 
@@ -1247,6 +1490,10 @@ class ScalperAgent:
                 second=0, microsecond=0).isoformat()
         return {
             "telemetry_authority": "OBSERVATION_ONLY",
+            "candidate_id": (getattr(trigger, "candidate_id", None)
+                              or candidate_id_for_trigger(
+                                  symbol, trigger, df_m15["time"].iloc[-1])
+                              if trigger.trigger_type == "SWEEP_REJECTION" else None),
             "config_era": DP.CONFIG_ERA,
             "liquidity_event_type": event,
             "liquidity_event_raw": raw_event,
@@ -1271,7 +1518,160 @@ class ScalperAgent:
             "raid_leg_vwap": None,
             "distance_to_leg_vwap_atr": None,
             "raid_time_msc": raid_time_msc,
+            # Facts-only Phase 1 telemetry. This nested snapshot is written
+            # through the existing observation recorder and is never read by
+            # selection or execution code.
+            "entry_setup_telemetry": EXEC_TEL.build_entry_observation(
+                symbol=symbol, trigger=trigger, legacy_decision="ALLOWED"),
+            "sweep_runtime_contract": self._sweep_runtime_record(trigger),
         }
+
+    @staticmethod
+    def _sweep_runtime_record(trigger) -> dict:
+        """Keep signal and executable facts separate in every journal."""
+        signal_entry = getattr(trigger, "entry_price", None)
+        signal_stop = getattr(trigger, "stop_loss", None)
+        signal_tp1 = getattr(trigger, "tp1", None)
+        signal_risk = (abs(float(signal_entry) - float(signal_stop))
+                       if signal_entry is not None and signal_stop is not None
+                       else 0.0)
+        signal_r = (abs(float(signal_tp1) - float(signal_entry)) /
+                    (signal_risk + 1e-10)
+                    if signal_entry is not None and signal_tp1 is not None
+                    and signal_risk > 0 else None)
+        final_quote = getattr(trigger, "final_quote", None) or {}
+        return {
+            "candidate_id": getattr(trigger, "candidate_id", None),
+            "decision_time": getattr(trigger, "decision_time", None),
+            "sweep_time": getattr(trigger, "sweep_time", None),
+            "direction": getattr(trigger, "direction", None),
+            "swept_level": getattr(trigger, "swept_level", None),
+            "signal_entry": signal_entry,
+            "signal_stop": signal_stop,
+            "signal_tp1": signal_tp1,
+            "signal_R": signal_r,
+            "signal_bid": getattr(trigger, "signal_bid", None),
+            "signal_ask": getattr(trigger, "signal_ask", None),
+            "signal_spread_pips": getattr(trigger, "signal_spread_pips", None),
+            "signal_net_R": getattr(trigger, "signal_net_R", None),
+            "location_context": (
+                trigger.location_context.record()
+                if getattr(trigger, "location_context", None) is not None
+                and hasattr(trigger.location_context, "record") else None),
+            "location_permission": (
+                trigger.location_permission.record()
+                if getattr(trigger, "location_permission", None) is not None
+                and hasattr(trigger.location_permission, "record") else None),
+            "final_location_context": (
+                trigger.final_location_context.record()
+                if getattr(trigger, "final_location_context", None) is not None
+                and hasattr(trigger.final_location_context, "record") else None),
+            "final_location_permission": (
+                trigger.final_location_permission.record()
+                if getattr(trigger, "final_location_permission", None) is not None
+                and hasattr(trigger.final_location_permission, "record") else None),
+            "final_executable_bid": final_quote.get("bid"),
+            "final_executable_ask": final_quote.get("ask"),
+            "selected_executable_price": final_quote.get("executable_price"),
+            "final_stop_distance_pips": final_quote.get("sl_pips"),
+            "final_spread_pips": final_quote.get("spread_pips"),
+            "final_net_R": final_quote.get("net_R"),
+            "final_permission": final_quote.get("allowed"),
+            "first_blocker": final_quote.get("blocker"),
+            "arrival_to_execution_ms": final_quote.get("arrival_to_execution_ms"),
+            "price_drift_points": final_quote.get("price_drift_points"),
+            "price_drift_R": final_quote.get("price_drift_R"),
+        }
+
+    def _finalize_sweep_location(self, symbol: str, trigger, now: datetime) -> tuple[bool, dict]:
+        """Revalidate the frozen sweep setup without migrating its location."""
+        original_context = getattr(trigger, "location_context", None)
+        original_permission = getattr(trigger, "location_permission", None)
+        failure = {"allowed": False, "blocker": "FINAL_LOCATION_NOT_FROZEN"}
+        if (original_context is None or original_permission is None or
+                not getattr(original_permission, "frozen", None) or
+                not getattr(original_context, "liquidity_pool_id", None)):
+            return False, failure
+        try:
+            df_m15 = self._get_ohlcv(symbol, self.TF_TRIGGER, bars=self.TRIGGER_BARS)
+            df_m5 = self._get_ohlcv(symbol, self.TF_CONFIRM, bars=self.CONFIRM_BARS)
+            df_w1 = self._get_ohlcv(symbol, mt5.TIMEFRAME_W1, bars=DP.MARKET_LOCATION_W1_BARS)
+            df_d1 = self._get_ohlcv(symbol, mt5.TIMEFRAME_D1, bars=DP.MARKET_LOCATION_D1_BARS)
+            df_h4 = self._get_ohlcv(symbol, self.TF_H4, bars=DP.MARKET_LOCATION_H4_BARS)
+            df_h1 = self._get_ohlcv(symbol, self.TF_H1, bars=DP.MARKET_LOCATION_H1_DETAIL_BARS)
+            df_m15_detail = self._get_ohlcv(symbol, mt5.TIMEFRAME_M15,
+                                            bars=DP.MARKET_LOCATION_M15_DETAIL_BARS)
+            df_m5_detail = self._get_ohlcv(symbol, mt5.TIMEFRAME_M5,
+                                           bars=DP.MARKET_LOCATION_M5_DETAIL_BARS)
+            if any(frame is None or len(frame) == 0
+                   for frame in (df_m15, df_m5, df_w1, df_d1, df_h4, df_h1,
+                                 df_m15_detail, df_m5_detail)):
+                return False, {**failure, "blocker": "FINAL_LOCATION_DATA_UNAVAILABLE"}
+            snapshot = self.market_location.snapshot(
+                symbol=symbol,
+                current_price=float(df_m5["close"].iloc[-1]),
+                df_w1=df_w1, df_d1=df_d1, df_h4=df_h4,
+                df_m15=df_m15_detail, df_h1=df_h1, df_m5=df_m5_detail,
+                as_of=now)
+            permission = build_location_permission(
+                snapshot, direction=trigger.direction,
+                trigger_type="SWEEP_REJECTION",
+                swept_level=trigger.swept_level,
+                triggered_at=original_permission.triggered_at,
+                frozen_location=original_permission.frozen)
+            permission = evaluate_sweep_reaction(
+                permission, df_m5,
+                sweep_time=getattr(trigger, "sweep_time", None))
+            context = build_sweep_location_context(
+                symbol=symbol, trigger=trigger, df_trigger=df_m15,
+                now=now, df_d1=df_d1, df_h1=df_h1, df_h4=df_h4,
+                df_w1=df_w1, policy=self.sweep_location_policy)
+        except Exception as exc:
+            logger.warning("SA %s: FINAL_SWEEP_LOCATION_ERROR %s", symbol, exc)
+            return False, {**failure, "blocker": "FINAL_LOCATION_DATA_UNAVAILABLE",
+                           "error": str(exc)}
+
+        frozen = original_permission.frozen
+        profile_pairs = (
+            (frozen.w1_profile_id, getattr(snapshot, "w1_profile_id", None)),
+            (frozen.h4_profile_id, getattr(snapshot, "h4_profile_id", None)),
+            (frozen.profile_id, getattr(snapshot, "active_profile_id", None)),
+        )
+        if any(old is not None and old != new for old, new in profile_pairs):
+            blocker = "FINAL_PROFILE_MIGRATION"
+        elif context.liquidity_pool_id != original_context.liquidity_pool_id:
+            blocker = "FINAL_POOL_MIGRATION"
+        elif context.liquidity_type == "UNKNOWN_LOCAL":
+            blocker = "FINAL_UNKNOWN_LOCAL"
+        elif context.already_consumed:
+            blocker = "FINAL_CONSUMED_POOL"
+        elif not context.allowed:
+            blocker = f"FINAL_{context.permission_reason or 'LOCATION_BLOCK'}"
+        elif permission.reason == "SETUP_EXPIRED":
+            blocker = "FINAL_SETUP_EXPIRED"
+        elif permission.reaction_state == "ACCEPTANCE" or "ACCEPTANCE" in str(permission.reason):
+            blocker = "FINAL_ACCEPTANCE"
+        elif permission.reason == "LOCATION_INVALIDATED":
+            blocker = "FINAL_LOCATION_INVALIDATED"
+        elif not permission.executable:
+            blocker = f"FINAL_{permission.rejection_code or permission.reason}"
+        elif permission.frozen.location_id != frozen.location_id:
+            blocker = "FINAL_LOCATION_MIGRATION"
+        else:
+            trigger.final_location_context = context
+            trigger.final_location_permission = permission
+            return True, {
+                "allowed": True,
+                "blocker": None,
+                "reaction_state": permission.reaction_state,
+                "confirmation_state": permission.confirmation_state,
+            }
+        trigger.final_location_context = context
+        trigger.final_location_permission = permission
+        logger.warning("SA %s: %s", symbol, blocker)
+        return False, {"allowed": False, "blocker": blocker,
+                       "reaction_state": permission.reaction_state,
+                       "confirmation_state": permission.confirmation_state}
 
     def _execute_trade(self, symbol: str, trigger, lot_size: float,
                        telemetry_context: Optional[dict] = None,
@@ -1329,6 +1729,57 @@ class ScalperAgent:
                 permission = getattr(trigger, "reclaim", None)
                 if permission is None or not entry_in_reclaim_zone(permission, price):
                     logger.warning(f"SA {symbol}: RECLAIM_QUOTE_MOVED — skip entry at {price}")
+                    return None
+
+            # Ordinary sweep entries have two final, independent contracts:
+            # the frozen causal location must still be valid, then the actual
+            # executable side of the quote must clear the same Step-3 limits
+            # used at signal time.  The signal entry is deliberately retained
+            # for telemetry and sizing attribution; only ``price`` is sent to
+            # the broker.
+            if trigger.trigger_type == "SWEEP_REJECTION":
+                final_now = datetime.now(timezone.utc)
+                location_ok, location_result = self._finalize_sweep_location(
+                    symbol, trigger, final_now)
+                if not location_ok:
+                    blocker = location_result.get("blocker", "FINAL_LOCATION_FAIL")
+                    self.rejects.record(blocker, symbol,
+                                        json.dumps(location_result, default=str),
+                                        final_now)
+                    trigger.final_quote = {"allowed": False,
+                                           "blocker": blocker,
+                                           "arrival_to_execution_ms": (
+                                               max(0.0, (final_now - getattr(
+                                                   trigger, "decision_time", final_now)).total_seconds() * 1000.0))}
+                    return None
+                final_quote = self.trigger_eng.final_quote_check(
+                    trigger, bid=float(tick.bid), ask=float(tick.ask),
+                    point=float(point), symbol=symbol)
+                signal_entry = float(trigger.entry_price)
+                drift_price = float(price) - signal_entry
+                signal_risk = abs(signal_entry - float(trigger.stop_loss))
+                final_quote.update(
+                    arrival_to_execution_ms=max(
+                        0.0, (final_now - getattr(trigger, "decision_time", final_now)).total_seconds() * 1000.0),
+                    price_drift_points=(drift_price / float(point)
+                                        if point > 0 else None),
+                    price_drift_R=((abs(drift_price) / signal_risk)
+                                   if signal_risk > 0 else None),
+                )
+                trigger.final_quote = final_quote
+                if not final_quote["allowed"]:
+                    blocker = final_quote.get("blocker", "FINAL_GEOMETRY_FAIL")
+                    logger.warning("SA %s: %s — %s", symbol, blocker,
+                                    final_quote.get("reason", ""))
+                    self.rejects.record(blocker, symbol,
+                                        json.dumps(final_quote, default=str),
+                                        final_now)
+                    return None
+                quoted = replace(trigger, entry_price=price)
+                lot_size = min(lot_size, self._calculate_lots(symbol, quoted))
+                if lot_size <= 0:
+                    trigger.final_quote["blocker"] = "FINAL_LOT_FLOOR"
+                    self.rejects.record("FINAL_LOT_FLOOR", symbol, "", final_now)
                     return None
 
             # Round SL/TP to symbol digits
@@ -2450,6 +2901,10 @@ def _connect_mt5(login: int, password: str, server: str) -> bool:
     return bool(mt5.initialize(login=login, password=password, server=server))
 
 
+def _load_sweep_location_policy(path: Optional[str]) -> SweepLocationPolicy:
+    return load_sweep_location_policy(path)
+
+
 def main():
     # TGA auto-spawn disabled — launch trade_guardian_agent.py separately
     # to avoid duplicate instances when managing agents independently.
@@ -2468,6 +2923,13 @@ def main():
                         help="Risk per trade as decimal of pool (default: 0.03 = 3%%)")
     parser.add_argument("--symbols",  type=str,   default="XAUUSD",
                         help="Comma-separated instrument list (default: XAUUSD)")
+    parser.add_argument("--sweep-location-config", default=None,
+                        help="JSON config containing sweep_location settings; "
+                             "activation is opt-in and defaults off")
+    parser.add_argument("--market-location-mode", choices=DP.MARKET_LOCATION_MODES,
+                        default=DP.MARKET_LOCATION_MODE,
+                        help="OFF preserves legacy trigger behavior; ACTIVE hard-gates "
+                             "SWEEP_REJECTION at W1/H4 VP and structural S/R")
     parser.add_argument("--interval", type=int,   default=30,
                         help="Analysis interval in seconds (default: 30)")
     parser.add_argument("--loss-limit", type=float, default=100.0,
@@ -2617,6 +3079,17 @@ def main():
                              "a stated risk budget (CLAUDE.md §13.9).")
     args = parser.parse_args()
 
+    requested_triggers = ([t.strip().upper() for t in args.triggers.split(",") if t.strip()]
+                          if args.triggers else [])
+    sweep_required = "SWEEP_REJECTION" in requested_triggers
+    if sweep_required and args.market_location_mode != "ACTIVE":
+        parser.error("SWEEP_REJECTION requires --market-location-mode ACTIVE")
+    try:
+        sweep_location_policy = load_sweep_location_policy(
+            args.sweep_location_config, require_active=sweep_required)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(f"SWEEP_REJECTION named-liquidity policy failed to load: {exc}")
+
     if not _acquire_single_instance_lock():
         logger.error(
             f"SA: another scalper instance already holds port "
@@ -2664,8 +3137,7 @@ def main():
         win_cooldown_minutes = args.win_cooldown_min,
         loss_cooldown_policy = args.loss_cooldown_policy,
         allow_whole_day      = args.allow_whole_day,
-        enabled_triggers     = ([t.strip() for t in args.triggers.split(",") if t.strip()]
-                                if args.triggers else None),
+        enabled_triggers     = (requested_triggers if args.triggers else None),
         enabled_sessions     = ([t.strip() for t in args.sessions.split(",") if t.strip()]
                                 if args.sessions else None),
         ema_band_enabled     = args.ema_band,
@@ -2692,6 +3164,8 @@ def main():
         ema_band_mode        = args.ema_band_mode,
         stb_relax_continuation = args.stb_relax,
         pool_mode            = args.pool_mode,
+        sweep_location_policy = sweep_location_policy,
+        market_location_mode  = args.market_location_mode,
     )
 
     try:

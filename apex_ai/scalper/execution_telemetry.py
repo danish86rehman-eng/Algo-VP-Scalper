@@ -7,11 +7,14 @@ All public recording methods return ``None``.
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import socket
 import statistics
 import time
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -24,6 +27,347 @@ BANNED_DECISION_FIELDS = {"allow", "blocked", "veto", "approved", "skip"}
 TELEMETRY_HOST = "127.0.0.1"
 TELEMETRY_PORT = 55557
 MAX_DATAGRAM_BYTES = 60_000
+
+ENTRY_TELEMETRY_SCHEMA = "SA_ENTRY_TELEMETRY_V1"
+ENTRY_TELEMETRY_SCHEMA_VERSION = 1
+ENTRY_LIFECYCLE_STAGES = (
+    "LOCATION_CONFIRMED",
+    "BREAK_OR_RAID_OBSERVED",
+    "RECLAIM_CONFIRMED",
+    "DISPLACEMENT_CONFIRMED",
+    "M15_FVG_ARMED",
+    "WAIT_M5_RETURN",
+    "READY",
+    "CONSUMED",
+)
+ENTRY_TERMINAL_REASONS = (
+    "INVALIDATED",
+    "STALE",
+    "REUSED",
+    "OBSTRUCTED",
+    "COST_REJECTED",
+    "LOT_FLOOR_REJECTED",
+)
+
+
+class EntryTelemetryIdentityError(ValueError):
+    """Raised when causal setup identity is incomplete or not canonicalizable."""
+
+
+def _canonical_decimal(value: Any, field_name: str) -> str:
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise EntryTelemetryIdentityError(
+            f"{field_name} must be a finite numeric value") from exc
+    if not number.is_finite():
+        raise EntryTelemetryIdentityError(f"{field_name} must be finite")
+    normalized = format(number, "f")
+    if "." in normalized:
+        normalized = normalized.rstrip("0").rstrip(".")
+    return normalized or "0"
+
+
+def _canonical_identity_value(value: Any, field_name: str) -> Any:
+    """Canonical JSON-safe value; floats become exact decimal strings."""
+    if value is None:
+        raise EntryTelemetryIdentityError(f"{field_name} is required")
+    if isinstance(value, (float, Decimal)):
+        return _canonical_decimal(value, field_name)
+    if isinstance(value, datetime):
+        return _canonical_timestamp(value, field_name)
+    if isinstance(value, dict):
+        if not value:
+            raise EntryTelemetryIdentityError(f"{field_name} is required")
+        result = {}
+        for key in sorted(value, key=str):
+            key_text = str(key)
+            child_name = f"{field_name}.{key_text}"
+            child = value[key]
+            if (key_text.lower().endswith("_at")
+                    or key_text.lower().endswith("_time")):
+                result[key_text] = _canonical_timestamp(child, child_name)
+            else:
+                result[key_text] = _canonical_identity_value(child, child_name)
+        return result
+    if isinstance(value, (list, tuple)):
+        if not value:
+            raise EntryTelemetryIdentityError(f"{field_name} is required")
+        return [_canonical_identity_value(item, f"{field_name}[]")
+                for item in value]
+    text = str(value).strip()
+    if not text:
+        raise EntryTelemetryIdentityError(f"{field_name} is required")
+    return text
+
+
+def _canonical_timestamp(value: Any, field_name: str) -> str:
+    if value is None or not str(value).strip():
+        raise EntryTelemetryIdentityError(f"{field_name} is required")
+    try:
+        stamp = pd.Timestamp(value)
+        if pd.isna(stamp):
+            raise ValueError
+        if stamp.tzinfo is None:
+            stamp = stamp.tz_localize("UTC")
+        else:
+            stamp = stamp.tz_convert("UTC")
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise EntryTelemetryIdentityError(
+            f"{field_name} must be a valid timestamp") from exc
+    return stamp.isoformat()
+
+
+@dataclass(frozen=True)
+class EntrySetupIdentity:
+    """Stable identity derived only from completed, causal setup facts."""
+
+    setup_id: str
+    payload: dict
+
+    def record(self) -> dict:
+        return {"setup_id": self.setup_id, "identity": self.payload}
+
+
+def build_setup_identity(*, symbol: str, direction: str,
+                         location_type: str, location_identity: Any,
+                         location_time: Any, reclaim_time: Any,
+                         fvg_formation_time: Any, fvg_identity: Any,
+                         location_price: Any = None) -> EntrySetupIdentity:
+    """Build a deterministic ID, failing closed on incomplete causal facts."""
+    symbol = str(symbol).strip().upper()
+    direction = str(direction).strip().upper()
+    if not symbol or direction not in {"BULLISH", "BEARISH"}:
+        raise EntryTelemetryIdentityError("symbol/direction is incomplete")
+    payload = {
+        "schema_version": ENTRY_TELEMETRY_SCHEMA_VERSION,
+        "symbol": symbol,
+        "direction": direction,
+        "location_type": _canonical_identity_value(location_type,
+                                                    "location_type"),
+        "location_identity": _canonical_identity_value(location_identity,
+                                                         "location_identity"),
+        "location_time_utc": _canonical_timestamp(location_time,
+                                                    "location_time"),
+        "reclaim_time_utc": _canonical_timestamp(reclaim_time,
+                                                  "reclaim_time"),
+        "fvg_formation_time_utc": _canonical_timestamp(fvg_formation_time,
+                                                         "fvg_formation_time"),
+        "fvg_identity": _canonical_identity_value(fvg_identity,
+                                                   "fvg_identity"),
+    }
+    if location_price is not None:
+        payload["location_price"] = _canonical_decimal(location_price,
+                                                        "location_price")
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                          ensure_ascii=True).encode("utf-8")
+    setup_id = "ES1_" + hashlib.sha256(encoded).hexdigest()[:32]
+    return EntrySetupIdentity(setup_id=setup_id, payload=payload)
+
+
+@dataclass
+class EntryLifecycleTelemetry:
+    """Telemetry-only lifecycle; it cannot be converted into an order plan."""
+
+    setup_id: str
+    current_stage: str = "LOCATION_CONFIRMED"
+    terminal_reason: Optional[str] = None
+    staged_status: str = "NOT_EVALUATED"
+    transitions: list[dict] = field(default_factory=list)
+
+    def __post_init__(self):
+        if not str(self.setup_id).strip():
+            raise EntryTelemetryIdentityError("setup_id is required")
+        if self.current_stage not in ENTRY_LIFECYCLE_STAGES:
+            raise ValueError("invalid initial lifecycle stage")
+        if not self.transitions:
+            self.transitions.append({"stage": self.current_stage})
+
+    def advance(self, stage: str, observed_at: Any = None) -> None:
+        if self.terminal_reason is not None or self.current_stage == "CONSUMED":
+            raise ValueError("terminal lifecycle cannot advance")
+        if stage not in ENTRY_LIFECYCLE_STAGES:
+            raise ValueError(f"unknown lifecycle stage: {stage}")
+        if stage == self.current_stage:
+            return
+        current = ENTRY_LIFECYCLE_STAGES.index(self.current_stage)
+        if ENTRY_LIFECYCLE_STAGES.index(stage) != current + 1:
+            raise ValueError(f"invalid lifecycle transition: {self.current_stage}->{stage}")
+        event = {"stage": stage}
+        if observed_at is not None:
+            event["observed_at_utc"] = _canonical_timestamp(observed_at,
+                                                              "observed_at")
+        self.transitions.append(event)
+        self.current_stage = stage
+
+    def terminate(self, reason: str, observed_at: Any = None) -> None:
+        if self.terminal_reason is not None or self.current_stage == "CONSUMED":
+            raise ValueError("terminal lifecycle cannot terminate twice")
+        if reason not in ENTRY_TERMINAL_REASONS:
+            raise ValueError(f"unknown terminal reason: {reason}")
+        event = {"terminal_reason": reason}
+        if observed_at is not None:
+            event["observed_at_utc"] = _canonical_timestamp(observed_at,
+                                                              "observed_at")
+        self.transitions.append(event)
+        self.terminal_reason = reason
+
+    def consume(self, observed_at: Any = None) -> None:
+        self.advance("CONSUMED", observed_at)
+
+    def record(self) -> dict:
+        return {
+            "schema": ENTRY_TELEMETRY_SCHEMA,
+            "schema_version": ENTRY_TELEMETRY_SCHEMA_VERSION,
+            "telemetry_authority": "OBSERVATION_ONLY",
+            "staged_status": self.staged_status,
+            "setup_id": self.setup_id,
+            "lifecycle_stage": self.current_stage,
+            "terminal_reason": self.terminal_reason,
+            "transitions": list(self.transitions),
+        }
+
+
+def _record_for_telemetry(value: Any) -> dict:
+    if value is None:
+        return {}
+    if hasattr(value, "record"):
+        value = value.record()
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _causal_identity_from_trigger(trigger: Any) -> Optional[dict]:
+    """Extract only explicit existing evidence; never infer missing stages."""
+    s01 = getattr(trigger, "s01", None)
+    if s01 is not None:
+        data = _record_for_telemetry(s01)
+        telemetry = data.get("telemetry", data)
+        reference = telemetry.get("reference", {})
+        poi = (telemetry.get("m5_fvg") or telemetry.get("m5_ob") or
+               {"low": telemetry.get("selected_entry_level"),
+                "high": telemetry.get("selected_entry_level")})
+        return {
+            "location_type": telemetry.get("selected_entry_model") or "S01",
+            "location_identity": {
+                "setup_id": telemetry.get("setup_id"),
+                "reference_id": reference.get("reference_id"),
+            },
+            "location_time": telemetry.get("selected_entry_timestamp") or
+                             telemetry.get("raid_start"),
+            "reclaim_time": telemetry.get("reclaim_timestamp") or
+                            telemetry.get("m15_mss_timestamp"),
+            "fvg_formation_time": (poi.get("formed_at") or
+                                    telemetry.get("m5_displacement_timestamp")),
+            "fvg_identity": {"low": poi.get("low"), "high": poi.get("high"),
+                             "model": telemetry.get("m5_entry_model")},
+            "location_price": telemetry.get("selected_entry_level"),
+        }
+    for name in ("reclaim", "fvg_entry", "htf_crt", "session_sweep"):
+        data = _record_for_telemetry(getattr(trigger, name, None))
+        if not data:
+            continue
+        if name == "reclaim":
+            return {
+                "location_type": "BROKEN_LEVEL",
+                "location_identity": {"level": data.get("level"),
+                                       "broken_at": data.get("broken_at")},
+                "location_time": data.get("broken_at"),
+                "reclaim_time": data.get("reclaimed_at"),
+                "fvg_formation_time": data.get("fvg_formed_at"),
+                "fvg_identity": {"low": data.get("fvg_low"),
+                                 "high": data.get("fvg_high")},
+                "location_price": data.get("level"),
+            }
+        if name == "fvg_entry":
+            return {
+                "location_type": "M15_FVG",
+                "location_identity": {"low": data.get("fvg_low"),
+                                       "high": data.get("fvg_high")},
+                "location_time": data.get("formed_at"),
+                "reclaim_time": data.get("displacement_at"),
+                "fvg_formation_time": data.get("formed_at"),
+                "fvg_identity": {"low": data.get("fvg_low"),
+                                 "high": data.get("fvg_high"),
+                                 "formed_at": data.get("formed_at")},
+            }
+        if name == "htf_crt":
+            return {
+                "location_type": f"{data.get('timeframe', '')}_CRT",
+                "location_identity": {"anchor_at": data.get("anchor_at"),
+                                       "swept_level": data.get("swept_level")},
+                "location_time": data.get("anchor_at"),
+                "reclaim_time": data.get("reclaimed_at"),
+                "fvg_formation_time": data.get("formed_at"),
+                "fvg_identity": {"low": data.get("fvg_low"),
+                                 "high": data.get("fvg_high")},
+                "location_price": data.get("swept_level"),
+            }
+        if name == "session_sweep":
+            return {
+                "location_type": "SESSION_SWEEP",
+                "location_identity": {"setup_id": data.get("setup_id"),
+                                       "pivot_at": data.get("pivot_at")},
+                "location_time": data.get("pivot_at"),
+                "reclaim_time": data.get("reclaim_at"),
+                "fvg_formation_time": data.get("mss_at"),
+                "fvg_identity": {"target_id": data.get("target_id"),
+                                 "pivot": data.get("pivot")},
+                "location_price": data.get("pivot"),
+            }
+    return None
+
+
+def build_entry_observation(*, symbol: str, trigger: Any,
+                            legacy_decision: str = "NOT_EVALUATED",
+                            legacy_reason: Optional[str] = None) -> dict:
+    """Return a facts-only snapshot for the existing execution telemetry path."""
+    matched = list(getattr(trigger, "matched_triggers", ()) or ())
+    observation = {
+        "schema": ENTRY_TELEMETRY_SCHEMA,
+        "schema_version": ENTRY_TELEMETRY_SCHEMA_VERSION,
+        "telemetry_authority": "OBSERVATION_ONLY",
+        "staged_status": "NOT_EVALUATED",
+        "setup_id": None,
+        "setup_id_reason": "MISSING_CAUSAL_FIELDS",
+        "lifecycle_stage": None,
+        "terminal_reason": None,
+        "selected_trigger": str(getattr(trigger, "trigger_type", "NONE")),
+        "matched_triggers": matched,
+        "direction": str(getattr(trigger, "direction", "NONE")),
+        "entry": getattr(trigger, "entry_price", None),
+        "stop_loss": getattr(trigger, "stop_loss", None),
+        "take_profit": getattr(trigger, "tp1", None),
+        "legacy_decision": legacy_decision,
+        "legacy_reason": legacy_reason,
+    }
+    location_context = getattr(trigger, "location_context", None)
+    if location_context is not None and hasattr(location_context, "record"):
+        observation["sweep_location_context"] = location_context.record()
+    market_location = getattr(trigger, "market_location", None)
+    if market_location is not None and hasattr(market_location, "record"):
+        observation["market_location"] = market_location.record()
+    location_permission = getattr(trigger, "location_permission", None)
+    if location_permission is not None and hasattr(location_permission, "record"):
+        observation["location_permission"] = location_permission.record()
+    observation["reaction_state"] = getattr(trigger, "reaction_state", "NO_REACTION")
+    observation["confirmation_state"] = getattr(trigger, "confirmation_state", "NONE")
+    causal = _causal_identity_from_trigger(trigger)
+    if causal is None:
+        return observation
+    try:
+        identity = build_setup_identity(symbol=symbol,
+                                        direction=observation["direction"],
+                                        **causal)
+    except EntryTelemetryIdentityError as exc:
+        observation["setup_id_reason"] = str(exc)
+        return observation
+    observation.update(identity.record())
+    observation["setup_id_reason"] = None
+    observation["location_type"] = causal["location_type"]
+    observation["lifecycle_stage"] = "LOCATION_CONFIRMED"
+    return observation
 
 
 class NullExecutionTelemetry:

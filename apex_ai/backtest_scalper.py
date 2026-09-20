@@ -17,9 +17,11 @@ cannot express that.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
 import os
+from types import SimpleNamespace
 from collections import Counter
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta, timezone
@@ -47,11 +49,22 @@ from scalper.trigger_engine import (
 from scalper.leg_confluence import (
     MODES as LEG_CONF_MODES, build_leg_pair,
     evaluate as leg_conf_evaluate)
+from scalper.market_location import MarketLocationConfig, MarketLocationEngine
+from scalper.location_permission import (build_location_permission,
+                                          evaluate_sweep_reaction)
 from scalper.vp_gate import MODES as VP_MODES, VolumeProfileGate
 from scalper.regime_classifier import RegimeClassifier
 from scalper.regime_direction_gate import (
     MODES as RD_MODES, RegimeDirectionGate)
 from scalper.pdr_gate import MODES as PDR_MODES, PDRGate
+from scalper.execution_telemetry import build_entry_observation
+from scalper.sweep_location import (SweepLocationPolicy,
+                                     build_sweep_location_context,
+                                     load_sweep_location_policy)
+from scalper.candidate_funnel import (CandidateFunnelRecorder,
+                                       candidate_id_for_trigger,
+                                       make_candidate_id)
+from scalper.independent_outcomes import evaluate_sweep
 from scalper.vp_liquidity_trigger import (
     VPLRParams,
     build_context as vplr_context,
@@ -199,6 +212,58 @@ class SimTrade:
     m15_fvg: Optional[dict] = None
     htf_crt: Optional[dict] = None
     session_sweep: Optional[dict] = None
+    entry_setup_telemetry: Optional[dict] = None
+    market_location: Optional[dict] = None
+    location_permission: Optional[dict] = None
+    sweep_runtime_contract: Optional[dict] = None
+
+
+def _sweep_runtime_record(trigger) -> dict:
+    signal_entry = getattr(trigger, "entry_price", None)
+    signal_stop = getattr(trigger, "stop_loss", None)
+    signal_tp1 = getattr(trigger, "tp1", None)
+    risk = (abs(float(signal_entry) - float(signal_stop))
+            if signal_entry is not None and signal_stop is not None else 0.0)
+    signal_r = (abs(float(signal_tp1) - float(signal_entry)) / (risk + 1e-10)
+                if signal_entry is not None and signal_tp1 is not None and risk > 0
+                else None)
+    quote = getattr(trigger, "final_quote", None) or {}
+    context = getattr(trigger, "location_context", None)
+    permission = getattr(trigger, "location_permission", None)
+    final_context = getattr(trigger, "final_location_context", None)
+    final_permission = getattr(trigger, "final_location_permission", None)
+    return {
+        "candidate_id": getattr(trigger, "candidate_id", None),
+        "decision_time": getattr(trigger, "decision_time", None),
+        "sweep_time": getattr(trigger, "sweep_time", None),
+        "direction": getattr(trigger, "direction", None),
+        "swept_level": getattr(trigger, "swept_level", None),
+        "signal_entry": signal_entry,
+        "signal_stop": signal_stop,
+        "signal_tp1": signal_tp1,
+        "signal_R": signal_r,
+        "signal_spread_pips": getattr(trigger, "signal_spread_pips", None),
+        "signal_net_R": getattr(trigger, "signal_net_R", None),
+        "named_liquidity": context.record() if context is not None else None,
+        "market_location": (getattr(trigger, "market_location", None).record()
+                            if getattr(trigger, "market_location", None) is not None else None),
+        "location_permission": permission.record() if permission is not None else None,
+        "final_location_context": final_context.record() if final_context is not None else None,
+        "final_location_permission": final_permission.record() if final_permission is not None else None,
+        "reaction_state": getattr(trigger, "reaction_state", "NO_REACTION"),
+        "confirmation_state": getattr(trigger, "confirmation_state", "NONE"),
+        "final_executable_bid": quote.get("bid"),
+        "final_executable_ask": quote.get("ask"),
+        "selected_executable_price": quote.get("executable_price"),
+        "final_stop_distance_pips": quote.get("sl_pips"),
+        "final_spread_pips": quote.get("spread_pips"),
+        "final_net_R": quote.get("net_R"),
+        "final_permission": quote.get("allowed"),
+        "first_blocker": quote.get("blocker"),
+        "arrival_to_execution_ms": quote.get("arrival_to_execution_ms"),
+        "price_drift_points": quote.get("price_drift_points"),
+        "price_drift_R": quote.get("price_drift_R"),
+    }
 
 
 def emit_incidents(all_trades, data, session_checker, path: str,
@@ -647,9 +712,19 @@ def run_backtest(
     round_trip_cost_price: Optional[float] = None,
     watch_inactive_crt: bool = True,
     session_sweep_enabled: bool = False,
+    historical_data: Optional[Dict[str, Dict[str, pd.DataFrame]]] = None,
+    historical_symbol_info: Optional[Dict[str, object]] = None,
+    candidate_funnel: Optional[CandidateFunnelRecorder] = None,
+    sweep_location_policy: Optional[SweepLocationPolicy] = None,
+    sweep_research_path: Optional[str] = None,
+    market_location_mode: str = DP.MARKET_LOCATION_MODE,
 ) -> Dict:
     from scalper.crt_confluence import validate_mode
     validate_mode(crt_confluence_mode)
+    market_location_mode = str(market_location_mode).upper()
+    if market_location_mode not in DP.MARKET_LOCATION_MODES:
+        raise ValueError("market_location_mode must be OFF or ACTIVE")
+    sweep_location_policy = sweep_location_policy or SweepLocationPolicy()
     if round_trip_cost_price is not None:
         if (not math.isfinite(round_trip_cost_price) or round_trip_cost_price < 0
                 or any(s != "XAUUSD" for s in symbols)):
@@ -662,6 +737,14 @@ def run_backtest(
                                                   vplr_enabled, htf_crt_enabled, session_sweep_enabled),
         sweep_wick_filter=sweep_wick_filter,
         sweep_wick_ratio=sweep_wick_ratio)
+    if "SWEEP_REJECTION" in trigger_engine.enabled_triggers:
+        if market_location_mode != "ACTIVE":
+            raise ValueError(
+                "SWEEP_REJECTION replay requires market_location_mode='ACTIVE'")
+        if not sweep_location_policy.active:
+            raise ValueError(
+                "SWEEP_REJECTION replay requires an ACTIVE sweep-location policy; "
+                "load config.json explicitly")
     # Mirrors ScalperAgent's VP_LIQUIDITY_REACTION construction (invariant #2):
     # same parameter object, same source, and the Asia allowance handed over
     # only when both the trigger and the override are on.
@@ -749,6 +832,7 @@ def run_backtest(
     session_indexes = {}
     session_used = set()
     session_funnel = Counter()
+    sweep_research_rows = {}
 
     # Every decision frame is fetched with a lead-in *before* the requested
     # start so that the first tradable bar already has the same history behind
@@ -760,8 +844,33 @@ def run_backtest(
     warmup_from = dt_from - timedelta(days=WARMUP_LEAD_DAYS)
 
     for symbol in symbols:
-        mt5.symbol_select(symbol, True)
-        info = mt5.symbol_info(symbol)
+        if historical_data is not None:
+            info = (historical_symbol_info or {}).get(symbol)
+            if info is None and symbol == "XAUUSD":
+                info = SimpleNamespace(point=0.01, trade_tick_size=0.01,
+                    trade_tick_value=1.0, volume_min=0.01, volume_step=0.01,
+                    volume_max=100.0, trade_contract_size=100.0)
+            frames_in = historical_data.get(symbol, {})
+            df_m5 = frames_in.get("M5", pd.DataFrame()).copy()
+            df_m15 = frames_in.get("M15", pd.DataFrame()).copy()
+            df_h1 = frames_in.get("H1", pd.DataFrame()).copy()
+            df_h4 = frames_in.get("H4", pd.DataFrame()).copy()
+            df_d1 = frames_in.get("D1", pd.DataFrame()).copy()
+            df_w1 = frames_in.get("W1", pd.DataFrame()).copy()
+        else:
+            mt5.symbol_select(symbol, True)
+            info = mt5.symbol_info(symbol)
+            df_m5 = _fetch(symbol, mt5.TIMEFRAME_M5, warmup_from, dt_to)
+            df_m15 = _fetch(symbol, mt5.TIMEFRAME_M15, warmup_from, dt_to)
+            df_h1 = _fetch(symbol, mt5.TIMEFRAME_H1, warmup_from, dt_to)
+            df_h4 = _fetch(symbol, mt5.TIMEFRAME_H4, warmup_from, dt_to)
+            df_d1 = _fetch(symbol, mt5.TIMEFRAME_D1, warmup_from, dt_to)
+            # W1 is the macro anchor, so it needs the same long history that
+            # live ``copy_rates_from_pos`` supplies; the generic 45-day gate
+            # warmup would otherwise make replay unable to form a W1 profile.
+            w1_warmup_from = dt_from - timedelta(
+                days=max(WARMUP_LEAD_DAYS, DP.MARKET_LOCATION_W1_BARS * 7 + 14))
+            df_w1 = _fetch(symbol, mt5.TIMEFRAME_W1, w1_warmup_from, dt_to)
         if (info is None or info.point <= 0 or info.trade_tick_value <= 0
                 or info.volume_min <= 0 or info.volume_step <= 0
                 or info.volume_max < info.volume_min
@@ -775,16 +884,11 @@ def run_backtest(
         # long event loops must not become invalid because a later terminal API
         # call transiently returns None.
         symbol_info_by_symbol[symbol] = info
-        df_m5 = _fetch(symbol, mt5.TIMEFRAME_M5, warmup_from, dt_to)
-        df_m15 = _fetch(symbol, mt5.TIMEFRAME_M15, warmup_from, dt_to)
-        df_h1 = _fetch(symbol, mt5.TIMEFRAME_H1, warmup_from, dt_to)
-        df_h4 = _fetch(symbol, mt5.TIMEFRAME_H4, warmup_from, dt_to)
-        df_d1 = _fetch(symbol, mt5.TIMEFRAME_D1, warmup_from, dt_to)
         if df_m5.empty or df_m15.empty or df_h1.empty:
             continue
         data[symbol] = {"M5": df_m5, "M15": df_m15, "H1": df_h1, "H4": df_h4,
-                        "D1": df_d1}
-        if session_sweep_enabled and symbol == "XAUUSD":
+                        "D1": df_d1, "W1": df_w1}
+        if session_sweep_enabled and symbol == "XAUUSD" and historical_data is None:
             session_indexes[symbol] = SS.reconstruct_levels(
                 _fetch(symbol, mt5.TIMEFRAME_M1, warmup_from, dt_to))
         if htf_crt_enabled:
@@ -819,6 +923,13 @@ def run_backtest(
     # cooldown, balance and position cap are global, so the replay must be too.
     events.sort(key=lambda e: (e[0], e[1]))
 
+    # One ledger per symbol keeps profile lifecycle history isolated while the
+    # pure snapshot builder remains identical to the live path.
+    market_location_engines = ({
+        symbol: MarketLocationEngine(config=MarketLocationConfig(
+            profile_target_bins=DP.MARKET_LOCATION_VP_ROWS))
+        for symbol in data}
+                               if market_location_mode == "ACTIVE" else {})
     all_trades: List[SimTrade] = []
     rejects: Counter = Counter()
     # Per-trigger instrumentation. A zero-trade result is not a negative
@@ -953,6 +1064,24 @@ def run_backtest(
             vp_profile = vp_gate.build_profile(
                 _closed_tf(frames['H4'], now, VP_PROFILE_FETCH_BARS, 240))
 
+        # Shared causal VP + structural S/R snapshot.  The trigger engine
+        # consumes it through the same permission layer as live; all later
+        # risk, geometry, and execution gates remain unchanged.
+        market_location = None
+        if market_location_mode == "ACTIVE":
+            location_m15 = frames["M15"].iloc[
+                max(0, i - DP.MARKET_LOCATION_M15_DETAIL_BARS):i]
+            location_h1 = (frames["H1"][frames["H1"]["time"] < now]
+                           .iloc[-DP.MARKET_LOCATION_H1_DETAIL_BARS:])
+            location_m5 = (frames["M5"][frames["M5"]["time"] < now]
+                           .iloc[-DP.MARKET_LOCATION_M5_DETAIL_BARS:])
+            market_location = market_location_engines[symbol].snapshot(
+                symbol=symbol,
+                current_price=float(df_m15_upto["close"].iloc[-1]),
+                df_w1=frames.get("W1"), df_d1=frames.get("D1"),
+                df_h4=frames.get("H4"), df_m15=location_m15,
+                df_h1=location_h1, df_m5=location_m5, as_of=now)
+
         # ── VP_LEG_CONFLUENCE legs — mirrors _scan_symbol (invariant #2) ────
         # Built once per symbol per bar, before any trigger is selected, so the
         # same two legs judge every candidate on this bar. `_closed_tf` for the
@@ -1011,6 +1140,7 @@ def run_backtest(
         if vp_only_bar:
             saved_triggers = trigger_engine.enabled_triggers
             trigger_engine.enabled_triggers = {"VP_LIQUIDITY_REACTION"}
+        funnel_seen = []
         try:
             trigger = trigger_engine.step2_trigger(
                 df_m15_upto, df_m5_upto, liq, symbol,
@@ -1020,17 +1150,91 @@ def run_backtest(
                 poc_band_frac=VP_POC_BAND_FRAC,
                 vplr_ctx=vplr_ctx, m15_fvg_entry=m15_fvg_plan,
                 htf_crt=crt_plan if not vp_only_bar else None,
-                session_sweep=session_plan)
+                session_sweep=session_plan,
+                candidate_observer=funnel_seen.append,
+                market_location=market_location,
+                market_location_mode=market_location_mode,
+                sweep_location_active=sweep_location_policy.active,
+                location_context_builder=(lambda t: build_sweep_location_context(
+                    symbol=symbol, trigger=t, df_trigger=df_m15_upto, liquidity=liq,
+                    now=now, df_d1=_closed_tf(frames.get("D1"), now, PDR_BARS, 1440),
+                    df_h1=_closed_tf(frames["H1"], now, HTF_BARS, 60),
+                    df_h4=_closed_tf(frames["H4"], now, H4_BARS, 240),
+                    session_tracker=stb_filter.liq_tracker,
+                    vp_profile=vp_profile, m15_fvg=m15_fvg_plan,
+                    policy=sweep_location_policy, point=info.point)
+                    if (candidate_funnel or sweep_location_policy.active or sweep_research_path) else None))
         finally:
             if vp_only_bar:
                 trigger_engine.enabled_triggers = saved_triggers
 
         if not trigger.detected:
+            if candidate_funnel is not None and funnel_seen:
+                completed_bar = df_m15_upto["time"].iloc[-1]
+                funnel_ids = [(t, candidate_funnel.observe_trigger(
+                    t, symbol, completed_bar, now)) for t in funnel_seen]
+                for observed, cid in funnel_ids:
+                    if cid:
+                        candidate_funnel.record_location_result(
+                            cid, observed, completed_bar, now)
+                candidate_funnel.record_selection(
+                    funnel_ids, trigger, completed_bar_ts=completed_bar,
+                    evaluation_ts=now)
             rejects["NO_TRIGGER"] += 1
             if vplr_ctx is not None:
                 probe = vplr_detect(df_m15_upto, df_m5_upto, vplr_ctx, liq)
                 rejects[f"VPLR_FUNNEL:{probe.reject_reason}"] += 1
             continue
+        if sweep_research_path and funnel_seen:
+            completed_bar = df_m15_upto["time"].iloc[-1]
+            entry_idx = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side="left"))
+            spread_price = (float(spread_by_symbol[symbol].iloc[i - 1])
+                            * info.point * 10.0)
+            for observed in funnel_seen:
+                if observed.trigger_type != "SWEEP_REJECTION":
+                    continue
+                cid = candidate_id_for_trigger(symbol, observed, completed_bar)
+                if cid in sweep_research_rows:
+                    continue
+                outcome = evaluate_sweep(
+                    trigger=observed, df_m5=frames["M5"], entry_idx=entry_idx,
+                    fill_at_next_bar_open=fill_at_next_bar_open,
+                    spread_price=spread_price,
+                    round_trip_cost_price=round_trip_cost_price)
+                ctx = getattr(observed, "location_context", None)
+                sweep_research_rows[cid] = {
+                    "candidate_id": cid, "symbol": symbol,
+                    "decision_time": completed_bar.isoformat(),
+                    "direction": observed.direction,
+                    "swept_level": observed.swept_level,
+                    "production_winner": trigger.trigger_type,
+                    "matched_triggers": "|".join(observed.matched_triggers),
+                    "location_context": (json.dumps(ctx.record(), sort_keys=True)
+                                          if ctx is not None else ""),
+                    **outcome.record(),
+                }
+        selected_id = None
+        if candidate_funnel and funnel_seen:
+            completed_bar = df_m15_upto["time"].iloc[-1]
+            funnel_ids = [(t, candidate_funnel.observe_trigger(
+                t, symbol, completed_bar, now)) for t in funnel_seen]
+            candidate_funnel.record_selection(
+                funnel_ids, trigger, completed_bar_ts=completed_bar,
+                evaluation_ts=now)
+            for observed, cid in funnel_ids:
+                if cid:
+                    candidate_funnel.record_location_result(
+                        cid, observed, completed_bar, now)
+            selected_id = next((cid for observed, cid in funnel_ids
+                                if observed is trigger), None)
+            if selected_id:
+                for observed, cid in funnel_ids:
+                    if cid and observed is not trigger:
+                        permission = getattr(observed, "location_permission", None)
+                        if permission is not None and not getattr(permission, "executable", False):
+                            continue
+                        candidate_funnel.preempt(
+                            cid, selected_id, trigger.trigger_type)
         detected[trigger.trigger_type] += 1
         ttype = trigger.trigger_type
 
@@ -1254,6 +1458,109 @@ def run_backtest(
             rejects_by_trigger[f"RECLAIM_QUOTE_MOVED:{ttype}"] += 1
             continue
 
+        # Replay the same final sweep contract as live. The M5 open is the
+        # simulated bid; BUYs execute on ask and SELLs on bid.
+        if trigger.trigger_type == "SWEEP_REJECTION":
+            trigger.decision_time = now
+            trigger.candidate_id = candidate_id_for_trigger(
+                symbol, trigger, df_m15_upto["time"].iloc[-1])
+            signal_spread_price = float(bar_spread) * info.point * 10.0
+            trigger.signal_bid = float(trigger.entry_price)
+            trigger.signal_ask = float(trigger.entry_price + signal_spread_price)
+            trigger.signal_spread_pips = float(bar_spread)
+            signal_sl_pips = abs(trigger.entry_price - trigger.stop_loss) / info.point / 10.0
+            signal_reward_pips = abs(trigger.tp1 - trigger.entry_price) / info.point / 10.0
+            trigger.signal_net_R = ((signal_reward_pips - 2.0 * bar_spread) /
+                                    (signal_sl_pips + 2.0 * bar_spread + 1e-10)
+                                    if signal_sl_pips > 0 else None)
+            original_context = getattr(trigger, "location_context", None)
+            original_permission = getattr(trigger, "location_permission", None)
+            location_blocker = None
+            if (original_context is None or original_permission is None or
+                    not getattr(original_permission, "frozen", None) or
+                    not getattr(original_context, "liquidity_pool_id", None)):
+                location_blocker = "FINAL_LOCATION_NOT_FROZEN"
+            else:
+                fill_time = frames["M5"].iloc[entry_idx]["time"]
+                final_context = build_sweep_location_context(
+                    symbol=symbol, trigger=trigger,
+                    df_trigger=frames["M15"].iloc[:i], now=fill_time,
+                    df_d1=frames.get("D1"), df_h1=frames.get("H1"),
+                    df_h4=frames.get("H4"), df_w1=frames.get("W1"),
+                    policy=sweep_location_policy, point=info.point)
+                final_permission = build_location_permission(
+                    market_location, direction=trigger.direction,
+                    trigger_type="SWEEP_REJECTION",
+                    swept_level=trigger.swept_level,
+                    triggered_at=original_permission.triggered_at,
+                    frozen_location=original_permission.frozen)
+                final_permission = evaluate_sweep_reaction(
+                    final_permission,
+                    frames["M5"][frames["M5"]["time"] < fill_time],
+                    sweep_time=getattr(trigger, "sweep_time", None))
+                trigger.final_location_context = final_context
+                trigger.final_location_permission = final_permission
+                frozen = original_permission.frozen
+                profiles_changed = any(old is not None and old != new for old, new in (
+                    (frozen.w1_profile_id, getattr(market_location, "w1_profile_id", None)),
+                    (frozen.h4_profile_id, getattr(market_location, "h4_profile_id", None)),
+                    (frozen.profile_id, getattr(market_location, "active_profile_id", None)),
+                ))
+                if profiles_changed:
+                    location_blocker = "FINAL_PROFILE_MIGRATION"
+                elif final_context.liquidity_pool_id != original_context.liquidity_pool_id:
+                    location_blocker = "FINAL_POOL_MIGRATION"
+                elif final_context.liquidity_type == "UNKNOWN_LOCAL":
+                    location_blocker = "FINAL_UNKNOWN_LOCAL"
+                elif final_context.already_consumed:
+                    location_blocker = "FINAL_CONSUMED_POOL"
+                elif not final_context.allowed:
+                    location_blocker = f"FINAL_{final_context.permission_reason or 'LOCATION_BLOCK'}"
+                elif final_permission.reason == "SETUP_EXPIRED":
+                    location_blocker = "FINAL_SETUP_EXPIRED"
+                elif (final_permission.reaction_state == "ACCEPTANCE"
+                      or "ACCEPTANCE" in str(final_permission.reason)):
+                    location_blocker = "FINAL_ACCEPTANCE"
+                elif final_permission.reason == "LOCATION_INVALIDATED":
+                    location_blocker = "FINAL_LOCATION_INVALIDATED"
+                elif not final_permission.executable:
+                    location_blocker = f"FINAL_{final_permission.rejection_code or final_permission.reason}"
+                elif final_permission.frozen.location_id != frozen.location_id:
+                    location_blocker = "FINAL_LOCATION_MIGRATION"
+            if location_blocker:
+                rejects[location_blocker] += 1
+                rejects_by_trigger[f"{location_blocker}:{ttype}"] += 1
+                trigger.final_quote = {"allowed": False, "blocker": location_blocker}
+                continue
+            spread_price = float(bar_spread) * info.point * 10.0
+            bid = float(fill_price)
+            ask = bid + spread_price
+            execution_price = ask if trigger.direction == "BULLISH" else bid
+            final_quote = trigger_engine.final_quote_check(
+                trigger, bid=bid, ask=ask, point=info.point, symbol=symbol)
+            drift_price = execution_price - float(trigger.entry_price)
+            final_quote.update(
+                arrival_to_execution_ms=max(
+                    0.0, (pd.Timestamp(fill_time).to_pydatetime() - now).total_seconds() * 1000.0),
+                price_drift_points=drift_price / info.point,
+                price_drift_R=(abs(drift_price) /
+                               abs(float(trigger.entry_price) - float(trigger.stop_loss))
+                               if abs(float(trigger.entry_price) - float(trigger.stop_loss)) > 0
+                               else None),
+            )
+            trigger.final_quote = final_quote
+            if not final_quote["allowed"]:
+                blocker = final_quote.get("blocker", "FINAL_GEOMETRY_FAIL")
+                rejects[blocker] += 1
+                rejects_by_trigger[f"{blocker}:{ttype}"] += 1
+                continue
+            volume = min(volume, _calc_volume(
+                symbol, risk_usd, execution_price, trigger.stop_loss, info))
+            if volume <= 0:
+                rejects["FINAL_LOT_FLOOR"] += 1
+                rejects_by_trigger[f"FINAL_LOT_FLOOR:{ttype}"] += 1
+                continue
+
         if guardian is not None:
             # Lot geometry decides whether a TP-extension partial can fill at
             # all; a 0.01-lot position cannot be halved and lives sets
@@ -1313,6 +1620,17 @@ def run_backtest(
             m15_fvg=trigger.fvg_entry.record() if trigger.fvg_entry else None,
             htf_crt=trigger.htf_crt.record() if trigger.htf_crt else None,
             session_sweep=trigger.session_sweep.record() if trigger.session_sweep else None,
+            entry_setup_telemetry=build_entry_observation(
+                symbol=symbol, trigger=trigger, legacy_decision="ALLOWED"),
+            market_location=(trigger.market_location.record()
+                             if getattr(trigger, "market_location", None) is not None
+                             else None),
+            location_permission=(trigger.location_permission.record()
+                                 if getattr(trigger, "location_permission", None) is not None
+                                 else None),
+            sweep_runtime_contract=(_sweep_runtime_record(trigger)
+                                    if trigger.trigger_type == "SWEEP_REJECTION"
+                                    else None),
             tga_managed=outcome is not None,
             tga_sl_stage=(outcome.sl_stage if outcome else 0),
             tga_peak_r=round(outcome.peak_r, 4) if outcome else 0.0,
@@ -1347,6 +1665,11 @@ def run_backtest(
             session_used.add(trigger.session_sweep.setup_id)
         pending_exits.append({"close_time": close_time, "trade": trade})
         pending_exits.sort(key=lambda p: p["close_time"])
+        if candidate_funnel is not None and selected_id:
+            candidate_funnel.terminal(
+                selected_id, "SIMULATED_ENTRY", "simulated order accepted",
+                values=(_sweep_runtime_record(trigger)
+                        if trigger.trigger_type == "SWEEP_REJECTION" else {}))
 
     flush_exits(datetime.max.replace(tzinfo=timezone.utc))
     all_trades.sort(key=lambda t: t.open_time)
@@ -1360,6 +1683,19 @@ def run_backtest(
         incidents_written = emit_incidents(all_trades, data, session_checker,
                                            incidents_path)
         print(f"forensics: {incidents_written} incidents -> {incidents_path}")
+
+    if sweep_research_path:
+        fields = ["candidate_id", "symbol", "decision_time", "direction",
+                  "swept_level", "production_winner", "matched_triggers",
+                  "location_context", "outcome", "exit_price", "realised_R",
+                  "mfe_R", "mae_R", "bars_to_exit", "exit_time",
+                  "cost_price", "status"]
+        path = Path(sweep_research_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(sweep_research_rows.values())
 
     by_symbol: Dict[str, Dict[str, float]] = {}
     for t in all_trades:
@@ -1593,8 +1929,14 @@ def main() -> None:
                         help="Replay session-sweep trigger from historical M1, never the current vault CSV")
     parser.add_argument("--triggers", type=str, default=None,
                         help="Comma-separated trigger whitelist "
-                             "(SWEEP_REJECTION,FVG_FILL,BOS_RETEST,JUDAS). "
+                             "(SWEEP_REJECTION,FVG_FILL,BOS_RETEST,JUDAS,SESSION_SWEEP,VP_LIQUIDITY_REACTION,VALUE_AREA_FADE). "
                              "Mirrors scalper_agent.py --triggers.")
+    parser.add_argument("--market-location-mode", choices=DP.MARKET_LOCATION_MODES,
+                        default=DP.MARKET_LOCATION_MODE,
+                        help="OFF legacy behavior; ACTIVE binds SWEEP_REJECTION")
+    parser.add_argument("--sweep-location-config", default=None,
+                        help="JSON named-liquidity policy. Required and must be "
+                             "ACTIVE whenever SWEEP_REJECTION is enabled.")
     parser.add_argument("--sessions", type=str, default=None,
                         help="Comma-separated session whitelist (LONDON_OPEN,"
                              "PRE_LONDON,LONDON_NY,TOKYO_OPEN,NY_LUNCH_REV). "
@@ -1614,6 +1956,17 @@ def main() -> None:
                              "this JSONL path, for analyze_incidents.py. Uses "
                              "the same postmortem module the live agent uses.")
     args = parser.parse_args()
+
+    requested_triggers = ([t.strip().upper() for t in args.triggers.split(",") if t.strip()]
+                          if args.triggers else [])
+    sweep_required = "SWEEP_REJECTION" in requested_triggers
+    if sweep_required and args.market_location_mode != "ACTIVE":
+        parser.error("SWEEP_REJECTION requires --market-location-mode ACTIVE")
+    try:
+        sweep_location_policy = load_sweep_location_policy(
+            args.sweep_location_config, require_active=sweep_required)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(f"SWEEP_REJECTION named-liquidity policy failed to load: {exc}")
 
     dt_from = datetime.fromisoformat(args.date_from).replace(tzinfo=timezone.utc)
     dt_to = datetime.fromisoformat(args.date_to).replace(tzinfo=timezone.utc)
@@ -1662,13 +2015,14 @@ def main() -> None:
             win_cooldown_minutes=args.win_cooldown_min,
             loss_cooldown_policy=args.loss_cooldown_policy,
             allow_whole_day=args.allow_whole_day,
-            enabled_triggers=([t.strip() for t in args.triggers.split(",") if t.strip()]
-                              if args.triggers else None),
+            enabled_triggers=(requested_triggers if args.triggers else None),
             enabled_sessions=([t.strip() for t in args.sessions.split(",") if t.strip()]
                               if args.sessions else None),
             enforce_session_windows=not args.ignore_session_windows,
             enforce_news_blackout=not args.ignore_news_blackout,
             incidents_path=args.incidents,
+            market_location_mode=args.market_location_mode,
+            sweep_location_policy=sweep_location_policy,
         )
     finally:
         mt5.shutdown()
