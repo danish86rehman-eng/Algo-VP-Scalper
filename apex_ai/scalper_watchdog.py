@@ -28,12 +28,19 @@ GUARDIAN_SCRIPT = ROOT / "trade_guardian_agent.py"
 SCALPER_SCRIPT = ROOT / "scalper_agent.py"
 TELEMETRY_SCRIPT = ROOT / "execution_telemetry_worker.py"
 SCALPER_ARGS = [
-    "--pool", "1000",
+    "--pool", "994.67",
     "--risk", "0.03",
     "--symbols", "XAUUSD",
     "--interval", "30",
     "--loss-limit", "100.0",
     "--pool-mode", "FRESH",
+    "--no-reclaim-fvg",
+    "--sweep-location-config", "config.json",
+    "--market-location-mode", "ACTIVE",
+    "--allow-whole-day",
+    "--triggers", "SWEEP_REJECTION",
+    "--no-vplr",
+    "--no-session-sweep",
 ]
 
 INITIAL_RESTART_DELAY_SECONDS = 5.0

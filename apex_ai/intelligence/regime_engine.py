@@ -24,6 +24,13 @@ class RegimeState:
     behavior_state: str = "OBSERVE"   # EXPLOIT | OBSERVE | ADAPT | REDUCE | DISENGAGE
     description: str = ""
     timestamp: Optional[datetime] = None
+    # Observation fields only.  They expose values already used below; no
+    # decision reads them.
+    atr_ratio: float = 0.0
+    momentum: float = 0.0
+    structure_trend: str = "RANGING"
+    manipulation_detected: bool = False
+    manipulation_confidence: float = 0.0
 
     def allows_trading(self) -> bool:
         return self.behavior_state in ("EXPLOIT", "OBSERVE") and self.confidence >= 0.55
@@ -58,6 +65,11 @@ class RegimeEngine:
         momentum   = displacement.momentum_score
         is_swept   = manip.detected
         trend      = structure.trend
+        state.atr_ratio = atr_ratio
+        state.momentum = momentum
+        state.structure_trend = trend
+        state.manipulation_detected = is_swept
+        state.manipulation_confidence = manip.confidence
 
         # ── Regime classification ──────────────────────────────────────────
 

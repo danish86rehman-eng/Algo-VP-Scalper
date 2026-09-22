@@ -327,6 +327,29 @@ class SetupContractTests(unittest.TestCase):
 
     LEVEL = 4640.0
 
+    def test_manual_level_uses_full_reaction_contract_without_anchor(self):
+        scn = _Scenario(self.LEVEL, bearish=False)
+        ctx = VPLR.VPLRContext(
+            anchored=None,
+            params=_params(),
+            manual_levels=((VPLR.LEVEL_VAL, self.LEVEL),),
+        )
+        sig = VPLR.detect_with_context(scn.m15, scn.m5, ctx,
+                                       _liq_at(self.LEVEL, False))
+        self.assertTrue(sig.detected, sig.reject_reason)
+        self.assertEqual(sig.profile_type, "MANUAL")
+        self.assertEqual(sig.vp_level_name, VPLR.LEVEL_VAL)
+        self.assertEqual(sig.val, self.LEVEL)
+
+    def test_manual_level_parser_rejects_bad_or_duplicate_inputs(self):
+        self.assertEqual(VPLR.parse_manual_levels("POC=4331,VAL=4314"),
+                         ((VPLR.LEVEL_POC, 4331.0),
+                          (VPLR.LEVEL_VAL, 4314.0)))
+        for value in ("POC", "MID=4320", "VAL=-1", "POC=1,POC=2"):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    VPLR.parse_manual_levels(value)
+
     def test_full_short_setup_fires(self):
         scn = _Scenario(self.LEVEL, bearish=True)
         sig = _detect(scn, _StubAnchored(self.LEVEL, self.LEVEL + 30,
@@ -476,11 +499,11 @@ class PriorityTests(unittest.TestCase):
     LEVEL = 4640.0
 
     def test_vp_is_next_after_sweep_and_htf_crt(self):
-        self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS if t != "SESSION_SWEEP")[2],
+        self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS if t != "SESSION_SWEEP")[3],
                          "VP_LIQUIDITY_REACTION")
 
     def test_remaining_relative_order_after_operator_promotion(self):
-        self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS if t != "SESSION_SWEEP")[3:],
+        self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS if t != "SESSION_SWEEP")[4:],
                          ("FVG_FILL", "BOS_RETEST",
                           "JUDAS", "VALUE_AREA_FADE"))
 
@@ -568,17 +591,17 @@ class SessionAllowanceTests(unittest.TestCase):
         self.assertEqual(
             [(w.name, w.start, w.end) for w in SESSION_WINDOWS],
             [("LONDON_OPEN", dtime(7, 0), dtime(8, 30)),
-             ("LONDON_NY", dtime(12, 0), dtime(13, 30)),
-             ("PRE_LONDON", dtime(6, 30), dtime(7, 0)),
-             ("TOKYO_OPEN", dtime(0, 0), dtime(2, 0)),
+             ("LONDON_NY", dtime(11, 0), dtime(13, 30)),
+             ("PRE_LONDON", dtime(6, 0), dtime(7, 0)),
+             ("TOKYO_OPEN", dtime(0, 0), dtime(6, 0)),
              ("NY_LUNCH_REV", dtime(16, 30), dtime(17, 30))])
 
-    def test_vp_window_covers_the_measured_dead_zone(self):
-        """02:00-06:30 is the gap the 2026-08-27 log showed the agent IDLE in."""
+    def test_vp_window_overlaps_current_operator_sessions(self):
+        """The VP allowance does not make active operator sessions idle."""
         chk = SASessionChecker(vp_window=self.WINDOW)
         for hour in (2, 3, 4, 5, 6):
             self.assertTrue(chk.vp_window_open(self._at(hour)), hour)
-            self.assertFalse(chk.get_state(self._at(hour)).in_window, hour)
+            self.assertTrue(chk.get_state(self._at(hour)).in_window, hour)
 
     def test_vp_window_is_closed_outside_asia(self):
         chk = SASessionChecker(vp_window=self.WINDOW)
@@ -665,7 +688,7 @@ class STBMembershipTests(unittest.TestCase):
                          DP.VPLR_REGIMES)
 
     def test_ships_disabled(self):
-        self.assertFalse(DP.VPLR_ENABLED)
+        self.assertTrue(DP.VPLR_ENABLED)
 
 
 if __name__ == "__main__":

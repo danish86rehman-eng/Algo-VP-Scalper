@@ -1,7 +1,55 @@
 # Changelog
 
+## 2026-09-21 16:10 UTC — Profile-specific POC-bin contact gate
+
+- Fixed the SWEEP_REJECTION location gate so it evaluates independent active
+  W1 and H4 POC bins instead of requiring the latest close to be at the H4
+  context POC. A completed M5 range can now establish POC contact before the
+  close moves away, and the frozen profile remains valid through confirmation.
+- The change uses the real histogram-bin geometry with a small ATR-bounded
+  pad. It does not promote M15/reference profiles or arbitrary HVNs, and keeps
+  the existing M15 sweep, M5 reclaim, expiry, profile-replacement, risk, cost,
+  and broker gates.
+- Verification: 22 focused location tests, 687 full tests, and compile checks
+  passed. This is a targeted correctness fix; no performance promotion is
+  implied.
+
+## 2026-09-21 15:30 UTC — Direct POC sweep-rejection entry test
+
+- An authoritative active W1/H4 POC can now grant directional location
+  permission to `SWEEP_REJECTION` after its completed M5 sweep/rejection candle.
+- The POC path keeps raid, reclaim, acceptance, expiry, frozen-profile, risk,
+  cost, and broker checks, but no longer waits for a second M5 MSS or
+  displacement event. VAH/VAL and structural-location paths are unchanged.
+- Live and replay share the same permission and reaction code; focused tests
+  cover bullish, bearish, and disabled POC behavior. This is an
+  operator-directed live test, not a performance promotion.
+
+## 2026-09-21 08:00 UTC — Sweep-rejection-only live test
+
+- Persisted the watchdog scalper whitelist as `--triggers SWEEP_REJECTION`
+  together with `--no-vplr` and `--no-session-sweep`; this prevents the
+  parser's feature switches from implicitly adding other trigger families.
+- Retained the production whole-day override and ACTIVE sweep-location policy;
+  VP/location permission, cooldown, news, risk, and broker gates remain active.
+
 All notable changes to the APEX AI trading system. Timestamps are UTC.
 Newest first. Every entry states what changed, why, and how it was verified.
+
+## 2026-09-21 07:49 UTC — Persist whole-day scalper relaunch preference
+
+- Relaunched the watchdog-owned stack (scalper, Trade Guardian, and execution
+  telemetry) with the explicit `--allow-whole-day` scalper flag. The running
+  scalper command also carries the required ACTIVE market-location policy and
+  sweep-location config; existing operator-specific pool and reclaim settings
+  were preserved.
+- Persisted the preference in `scalper_watchdog.py` and the Apex operations
+  playbook so future relaunches keep the session gate open from 00:00–23:00
+  UTC. Cooldown, risk, news, location, execution, and the 23:00 daily close
+  remain independent safety gates.
+- Verification: environment import, all 681 tests, compile checks, and live
+  process inspection passed. The restarted scalper is owned by the watchdog;
+  TGA adopted the resulting XAUUSD position normally.
 
 ## 2026-09-20 04:32 UTC — Reconcile SWEEP_REJECTION code and runtime document
 
@@ -65,6 +113,44 @@ Newest first. Every entry states what changed, why, and how it was verified.
   per-timeframe ATR-distance telemetry, immutable sweep-location association,
   explicit acceptance/expiry rejection reasons, and checksummed atomic profile
   state. Profile lifecycle keys are symbol-scoped.
+- Fixed S01 `BUILD_VP -> VP_FROZEN`, causal FVG formation/retest indexing,
+  checksummed restart state, and final executable bid/ask validation against
+  the frozen M5 entry zone.
+- Restored the documented opt-in `Whole_day` constructor default and aligned
+  the replay session-sweep default with live. Verification: 645 tests pass,
+  environment imports and `compileall` pass, and `git diff --check` is clean.
+
+## 2026-09-14 11:52 UTC — Add expiring operator-supplied VP reaction watch
+
+- Added `--manual-vp-levels` and `--manual-vp-expiry` to live and replay paths.
+  Supplied POC/VAL/VAH prices replace only the profile-location input; the full
+  liquidity raid, reclaim/displacement, M5 MSS, confluence, consultation,
+  spread, net-R, news, risk and execution checks remain mandatory.
+- A manual watch receives its own trigger-scoped session allowance from process
+  launch until the UTC expiry. It cannot enable other triggers outside their
+  sessions, and becomes inert at expiry. Orders retain `MAGIC_SCALPER`, so TGA
+  adopts and manages any accepted position normally.
+- Added parser and end-to-end manual-level tests. All 551 tests pass and
+  `py -3.14 -E -m compileall -q .` is clean.
+
+## 2026-09-13 15:38 UTC — Add default-off tracked pullback entry model
+
+- Added an opt-in persistent lifecycle for default M15→M5 triggers: one displaced close through a
+  previously confirmed swing, one FVG tied to that displacement (or the immediately preceding
+  opposite candle as order-block fallback), one later midpoint-depth M5 rejection, then a 60-second
+  executable quote window. Geometry, attribution, six-hour expiry and the originating stop/targets
+  are frozen; duplicate same-direction breaks are counted and suppressed.
+- Live and replay use the same transition book. Live state is checksummed and atomically persisted,
+  broker orders/deals and durable pre-submit markers are reconciled after restart, malformed or
+  incomplete history fails closed, and order/account/quote/cost/risk checks remain immediately before
+  submission. HTF CRT/FVG and the default-off session sweep retain their own entry contracts.
+- `--tracked-pullback` is required in both live and replay; no live process was restarted and no order
+  was placed. The legacy reclaim on/off modes remain reproducible. XAUUSD replay PnL now uses the validated,
+  pre-run broker contract snapshot so long jobs cannot fail because MT5 IPC metadata disappears.
+- Added 22 focused lifecycle tests. The full suite runs 549 tests with no errors and the same three
+  pre-existing session-window assertion failures. Compilation passes. Research results are recorded
+  separately and are not sufficient authority for live activation.
+
 ## 2026-09-13 07:36 UTC — Add default-off completed-session sweep trigger
 
 - Added a feature-gated `SESSION_SWEEP` scalper trigger for completed Asia, London and New York

@@ -88,6 +88,7 @@ from scalper.vp_liquidity_trigger import (
     VPLRParams,
     build_context as vplr_context,
     detect_with_context as VPLR_DETECT,
+    parse_manual_levels,
 )
 
 
@@ -156,12 +157,13 @@ from scalper.trade_logger    import SATradeLogger, SATradeRecord
 from scalper.daily_reset     import SADailyReset
 from scalper.sa_consultant   import SAConsultant  # ReadOnly-Consultation layer
 from scalper.short_term_bias import ShortTermBiasFilter  # Task 6: short-term bias gate
-from scalper.cooldown        import SACooldown
+from scalper.cooldown        import SACooldown, DEFAULT_WIN_COOLDOWN_MINUTES
 from scalper.reclaim_fvg     import (evaluate_reclaim, entry_in_reclaim_zone,
                                      close_barriers)
 from scalper.m15_fvg_entry   import find_fvg_entry, entry_quote_allowed
 from scalper.htf_crt         import watch_crt, select_crt, used_setups, crt_quote_allowed
 from scalper import session_sweep as SS
+from scalper import tracked_pullback as TP
 from scalper.ema_filter      import EMABandFilter  # H1 EMA(18) high/low band
 from scalper.leg_confluence  import (MODES as LEG_CONF_MODES, build_leg_pair,
                                       evaluate as leg_conf_evaluate)
@@ -169,9 +171,13 @@ from scalper.market_location import MarketLocationConfig, MarketLocationEngine
 from scalper.location_permission import (build_location_permission,
                                           evaluate_sweep_reaction)
 from scalper.vp_gate         import MODES as VP_MODES, VolumeProfileGate
+from scalper.s01_reference_candle_raid_vp import S01Engine, S01Params
 from scalper.regime_classifier import RegimeClassifier  # trending vs ranging
 from scalper.regime_direction_gate import (
     MODES as RD_MODES, RegimeDirectionGate)  # do not fade a trend
+from scalper.regime_evidence import (
+    CandidateEvidenceSnapshot, RegimeBarSnapshot, RegimeEvidenceRecorder,
+    candidate_id)
 from scalper.pdr_gate       import (
     MODES as PDR_MODES, PDRGate)              # previous-day-range location
 from scalper.reject_log      import RejectionLog   # structured gate telemetry
@@ -304,7 +310,7 @@ class ScalperAgent:
                  symbols: List[str], loss_limit_usd: float = None,
                  interval: int = 30, dry_run: bool = False,
                  cooldown_enabled: bool = True,
-                 win_cooldown_minutes: float = 5.0,
+                 win_cooldown_minutes: float = DEFAULT_WIN_COOLDOWN_MINUTES,
                  loss_cooldown_policy: str = "NEXT_UTC_HOUR",
                  allow_whole_day: bool = False,
                  enabled_triggers=None,
@@ -330,19 +336,28 @@ class ScalperAgent:
                  pdr_gate_mode: str = DP.PDR_GATE_MODE,
                  vplr_enabled: bool = DP.VPLR_ENABLED,
                  vplr_session_override: bool = DP.VPLR_SESSION_OVERRIDE_ENABLED,
+                 vplr_manual_levels=(),
+                 vplr_manual_expiry: Optional[datetime] = None,
+                 s01_enabled: bool = DP.S01_ENABLED,
                  pool_mode: str = "RESUME",
                  session_sweep_enabled: bool = False,
                  session_liquidity_vault: str = SS.DEFAULT_VAULT,
+                 tracked_pullback_enabled: bool = False,
                  sweep_location_policy: Optional[SweepLocationPolicy] = None,
                  market_location_mode: str = DP.MARKET_LOCATION_MODE):
         self.symbols    = symbols
         self.interval   = interval
         self.dry_run    = dry_run
         self.session_sweep_enabled = session_sweep_enabled
+        self.s01_enabled = bool(s01_enabled)
         self.session_liquidity_vault = session_liquidity_vault
         self.sweep_location_policy = sweep_location_policy or SweepLocationPolicy()
         self._session_sweep_attempt_dir = Path(__file__).parent / "data/session_sweep_attempts"
         self.reclaim_fvg_enabled = reclaim_fvg_enabled
+        self.tracked_pullback_enabled = tracked_pullback_enabled
+        self._pullbacks = (TP.Book(Path(__file__).parent / 'data/tracked_pullback/book.json')
+                           if tracked_pullback_enabled else None)
+        self._pullback_ready = False
         self.m15_fvg_entry_enabled = m15_fvg_entry_enabled
         self.htf_crt_enabled = htf_crt_enabled
         from scalper.crt_confluence import validate_mode
@@ -404,8 +419,33 @@ class ScalperAgent:
         # decision path is exactly what it was before this change.
         self.vplr_enabled = bool(vplr_enabled)
         self.vplr_params = VPLRParams.from_decision_params(DP)
-        vp_window = (DP.VPLR_SESSION_WINDOW_UTC
-                     if (self.vplr_enabled and vplr_session_override) else None)
+        self.vplr_manual_levels = tuple(vplr_manual_levels or ())
+        self.vplr_manual_expiry = vplr_manual_expiry
+        self.s01_params = S01Params.from_decision_params(DP)
+        self._s01_engines = {str(symbol).upper(): S01Engine(
+            str(symbol), self.s01_params,
+            state_path=str(Path(DP.S01_STATE_DIR) / f"{str(symbol).upper()}.json"))
+                             for symbol in symbols} if self.s01_enabled else {}
+        if self.vplr_manual_levels:
+            if not self.vplr_enabled:
+                raise ValueError("manual VP levels require --vplr")
+            if vplr_manual_expiry is None or vplr_manual_expiry.tzinfo is None:
+                raise ValueError("manual VP levels require a timezone-aware expiry")
+            if vplr_manual_expiry.date() != self._start_time.date():
+                raise ValueError("manual VP watch must expire on its launch UTC date")
+            if vplr_manual_expiry <= self._start_time:
+                # A watchdog restart after the deadline must restore the
+                # ordinary scalper rather than crash-loop on a stale watch.
+                self.vplr_enabled = False
+                self.vplr_manual_levels = ()
+                vp_window = None
+            else:
+                # A manual watch is trigger-scoped. It may observe outside
+                # normal sessions without granting those hours to other triggers.
+                vp_window = (self._start_time.time(), vplr_manual_expiry.time())
+        else:
+            vp_window = (DP.VPLR_SESSION_WINDOW_UTC
+                         if (self.vplr_enabled and vplr_session_override) else None)
         self.session     = SASessionChecker(allow_whole_day=allow_whole_day,
                                             enabled_sessions=enabled_sessions,
                                             vp_window=vp_window)
@@ -415,7 +455,7 @@ class ScalperAgent:
         # trigger behind it. Mirrored in backtest_scalper.py (invariant #2).
         resolved_triggers = resolve_enabled_triggers(
             enabled_triggers, self.vplr_enabled, htf_crt_enabled,
-            session_sweep_enabled)
+            session_sweep_enabled, self.s01_enabled)
         if "SWEEP_REJECTION" in resolved_triggers:
             requested_market_location_mode = str(market_location_mode).upper()
             if requested_market_location_mode != "ACTIVE":
@@ -513,6 +553,7 @@ class ScalperAgent:
         # non-decisional.
         self.rejects = RejectionLog("logs/sa_rejections.json")
         self.incidents = PMORTEM.IncidentJournal("logs/sa_incidents.jsonl")
+        self.regime_evidence = RegimeEvidenceRecorder("logs/regime_evidence.jsonl")
         # Observation only: this recorder has no authority over trigger
         # selection, gates, sizing, or order submission.
         self.candidate_funnel = CandidateFunnelRecorder("logs/sa_candidate_funnel.jsonl")
@@ -564,6 +605,9 @@ class ScalperAgent:
             self.sweep_location_policy.match_tolerance_atr)
         logger.info("SWEEP_LOCATION_ALLOWED_FAMILIES=%s",
                     ",".join(self.sweep_location_policy.allowed_families) or "NONE")
+        if self.vplr_manual_levels:
+            logger.info("SA MANUAL VP: levels=%s expiry=%s",
+                        dict(self.vplr_manual_levels), self.vplr_manual_expiry.isoformat())
         logger.info(
             f"\n"
             f"{'='*60}\n"
@@ -613,6 +657,8 @@ class ScalperAgent:
                         self._watch_htf_crt(symbol, now)
 
                 # Session and state evaluation
+                if self.tracked_pullback_enabled:
+                    self._watch_pullbacks(now)
                 sess = self.session.get_state(now)
                 acct = mt5.account_info()
                 main_dd = self._get_main_dd(acct)
@@ -690,6 +736,42 @@ class ScalperAgent:
 
     # ── Symbol Scanning ───────────────────────────────────────────────────────
 
+    def _record_regime_bar(self, symbol: str, df_m15, df_m5) -> None:
+        """Persist one closed M15 context observation, independent of triggers."""
+        try:
+            m15_time = df_m15["time"].iloc[-1].isoformat()
+            if self.regime_evidence.seen_bar(symbol, "M15", m15_time):
+                return
+            df_h1 = self._get_ohlcv(symbol, self.TF_H1, bars=DP.CONSULT_HTF_BARS)
+            if df_h1 is None:
+                return
+            result = self.consultant.observe_frames(symbol, df_m15, df_h1)
+            if not result.success:
+                return
+            h1_time = df_h1["time"].iloc[-1].isoformat()
+            self.regime_evidence.record_bar(RegimeBarSnapshot(
+                timestamp_utc=datetime.now(timezone.utc).isoformat(),
+                symbol=symbol, decision_timeframe="M15",
+                completed_bar_timestamp_utc=m15_time,
+                ict_context=result.regime, context_score=result.regime_confidence,
+                atr_ratio=result.atr_ratio,
+                displacement_momentum=result.displacement_momentum_score,
+                structure_trend=result.structure_trend,
+                manipulation_detected=result.manipulation_detected,
+                manipulation_confidence=result.manipulation_confidence,
+                liquidity_state=("MANIPULATION" if result.manipulation_detected
+                                 else "NONE"),
+                statistical_context=result.statistical_regime,
+                autocorrelation=result.statistical_autocorrelation,
+                efficiency_ratio=result.statistical_efficiency_ratio,
+                volatility_ratio=result.statistical_volatility_ratio,
+                source_bar_m5_utc=(df_m5["time"].iloc[-1].isoformat()
+                                   if df_m5 is not None else None),
+                source_bar_m15_utc=m15_time, source_bar_h1_utc=h1_time,
+                source_bar_h4_utc=None))
+        except Exception as exc:
+            logger.warning(f"SA {symbol}: regime bar evidence failed: {exc}")
+
     def _scan_symbol(self, symbol: str, sess, main_dd: float, now: datetime,
                      vp_only: bool = False):
         """
@@ -709,6 +791,11 @@ class ScalperAgent:
         if df_m5 is None or df_m1 is None:
             self.rejects.record("NO_DATA", symbol, "OHLCV fetch returned None", now)
             return
+
+        # Authoritative market-state snapshot: once per scan, before trigger
+        # detection.  Trigger selection consumes it through one permission
+        # layer; no trigger recalculates VP/SR independently.
+        self._record_regime_bar(symbol, df_m5, df_m1)
 
         # Global post-trade cooldown (win = short break, loss = until the next
         # UTC hour). Checked before any analysis so a paused agent does no work.
@@ -816,8 +903,14 @@ class ScalperAgent:
         # all, so it cannot pre-empt a detector that was already trading those
         # hours profitably. Skipping the build also avoids two OHLCV fetches
         # per scan for a trigger that could not fire.
+        manual_levels = getattr(self, "vplr_manual_levels", ())
+        manual_expiry = getattr(self, "vplr_manual_expiry", None)
+        manual_vp_active = (bool(manual_levels)
+                            and manual_expiry is not None
+                            and now < manual_expiry)
         vplr_in_scope = (self.vplr_enabled
-                         and (DP.VPLR_SCOPE == "ALL_SESSIONS" or vp_only))
+                         and (manual_vp_active
+                              or DP.VPLR_SCOPE == "ALL_SESSIONS" or vp_only))
         if vplr_in_scope:
             df_h4_vplr = self._get_ohlcv(symbol, DP.VPLR_PROFILE_TF,
                                          bars=DP.VPLR_PROFILE_FETCH_BARS)
@@ -830,6 +923,9 @@ class ScalperAgent:
                         symbol, self._get_ohlcv(symbol, self.TF_H1, bars=120),
                         None),
                 )
+                if manual_vp_active:
+                    vplr_ctx = replace(vplr_ctx,
+                                       manual_levels=manual_levels)
 
         session_sweep_plan = None
         if getattr(self, "session_sweep_enabled", False) and not vp_only:
@@ -852,6 +948,31 @@ class ScalperAgent:
             elif m15_fvg_plan.reason != "M15_FVG_WAIT_PRICE":
                 self.rejects.record(m15_fvg_plan.reason, symbol, str(m15_fvg_plan.record()), now)
 
+        # S01 is the only stateful detector.  Its D1 reference, raid, delivery
+        # leg and frozen profile live in one per-symbol engine and are advanced
+        # before the stateless trigger selector runs.  The same completed-bar
+        # contract is used by replay.
+        s01_result = None
+        if getattr(self, "s01_enabled", False) and not vp_only:
+            df_d1_s01 = self._get_ohlcv(symbol, mt5.TIMEFRAME_D1, bars=DP.PDR_BARS)
+            tick_s01 = mt5.symbol_info_tick(symbol)
+            info_s01 = mt5.symbol_info(symbol)
+            if df_d1_s01 is not None and tick_s01 is not None and info_s01 is not None:
+                s01_result = self._s01_engines[symbol].step(
+                    df_m5, df_m1, df_d1_s01,
+                    current_price=(float(tick_s01.bid) + float(tick_s01.ask)) / 2.0,
+                    spread_price=float(tick_s01.ask - tick_s01.bid),
+                    min_stop_distance=float(getattr(info_s01, "trade_stops_level", 0))
+                    * float(info_s01.point),
+                    now=now,
+                    session=self.session.vp_window_name(now),
+                )
+                self.candidate_funnel.observe_s01(
+                    s01_result, symbol,
+                    completed_bar_ts=df_m5["time"].iloc[-1] if "time" in df_m5.columns else None,
+                    evaluation_ts=now,
+                )
+
         # In VP_ONLY the engine is asked for one detector. This is a narrowing
         # of what may fire, never a widening: the trigger's own contract still
         # has to hold in full.
@@ -868,6 +989,8 @@ class ScalperAgent:
                 vplr_ctx=vplr_ctx, m15_fvg_entry=m15_fvg_plan,
                 htf_crt=self._crt_candidate(symbol, df_m5, df_m1, now) if not vp_only else None,
                 session_sweep=session_sweep_plan,
+                candidate_filter=(lambda t: self._pullbacks.filter_candidate(symbol, t, df_m5, now))
+                    if getattr(self, 'tracked_pullback_enabled', False) and self._pullback_ready else None,
                 candidate_observer=funnel_seen.append,
                 market_location=market_location,
                 market_location_mode=getattr(self, "market_location_mode", "OFF"),
@@ -881,11 +1004,23 @@ class ScalperAgent:
                     session_tracker=self.stb_filter.liq_tracker,
                     vp_profile=vp_profile, m15_fvg=m15_fvg_plan,
                     policy=getattr(self, "sweep_location_policy", SweepLocationPolicy()),
-                    point=getattr(mt5.symbol_info(symbol), "point", None))))
+                    point=getattr(mt5.symbol_info(symbol), "point", None))),
+                s01_result=s01_result)
         finally:
             if vp_only:
                 self.trigger_eng.enabled_triggers = saved
 
+        if getattr(self, 'tracked_pullback_enabled', False):
+            if not self._pullback_ready:
+                self.rejects.record('PULLBACK_RECOVERY_UNAVAILABLE', symbol, '', now)
+                return
+            tick = mt5.symbol_info_tick(symbol)
+            if tick is None or not 0 <= now.timestamp()-tick.time <= 60:
+                self.rejects.record('PULLBACK_QUOTE_STALE', symbol, '', now)
+                return
+            self._pullbacks.advance(symbol, df_m5, df_m1, now, tick.bid, tick.ask)
+            trigger = self._pullbacks.select(symbol, trigger, tick.bid, tick.ask, now,
+                {'VP_LIQUIDITY_REACTION'} if vp_only else self.trigger_eng.enabled_triggers)
         if not trigger.detected:
             funnel_recorder = getattr(self, "candidate_funnel", None)
             if funnel_recorder is not None and funnel_seen:
@@ -956,7 +1091,8 @@ class ScalperAgent:
                                       evaluation_ts=now,
                                       source_timeframes=("M15", "M5"))
 
-        analysis_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt or trigger.session_sweep) else
+        analysis_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt or trigger.session_sweep
+                                                   or trigger.pullback or getattr(trigger, "s01", None)) else
                           float(df_m5['close'].iloc[-1]))
         if trigger.matched_triggers and len(trigger.matched_triggers) > 1:
             logger.info(
@@ -969,7 +1105,8 @@ class ScalperAgent:
 
         # L-017 is a mandatory sequence check for every entry type. A local
         # sweep never substitutes for reclaiming broken support/resistance.
-        if self.reclaim_fvg_enabled and trigger.session_sweep is None:
+        if TP.legacy_required(self.reclaim_fvg_enabled,
+                              getattr(self, 'tracked_pullback_enabled', False), trigger):
             if not self._reclaim_history_ready:
                 self.rejects.record("RECLAIM_HISTORY_UNAVAILABLE", symbol,
                                     "cannot restore prior-entry barrier", now)
@@ -1239,6 +1376,50 @@ class ScalperAgent:
                 return
 
             allowed = self.TRIGGER_REGIME_WHITELIST.get(trigger.trigger_type)
+            regime_pass = allowed is not None and consult.regime in allowed
+            regime_reason = ("STRESS rejects all triggers" if consult.regime == "STRESS"
+                             else (f"{consult.regime} unsuitable for {trigger.trigger_type}"
+                                   if not regime_pass else ""))
+            try:
+                m15_time = df_m5["time"].iloc[-1].isoformat()
+                h1_time = df_h1["time"].iloc[-1].isoformat() if df_h1 is not None else None
+                snapshot = CandidateEvidenceSnapshot(
+                    timestamp_utc=now.isoformat(), symbol=symbol,
+                    decision_timeframe="M15", completed_bar_timestamp_utc=m15_time,
+                    candidate_id=candidate_id(symbol, m15_time, trigger.trigger_type,
+                                              trigger.direction, trigger.entry_price,
+                                              trigger.stop_loss, trigger.tp1),
+                    direction=trigger.direction, trigger_type=trigger.trigger_type,
+                    entry_price=trigger.entry_price, stop_loss=trigger.stop_loss,
+                    tp1=trigger.tp1, tp2=trigger.tp2,
+                    ict_context=consult.regime, context_score=consult.regime_confidence,
+                    atr_ratio=consult.atr_ratio,
+                    displacement_momentum=consult.displacement_momentum_score,
+                    structure_trend=consult.structure_trend,
+                    manipulation_detected=consult.manipulation_detected,
+                    manipulation_confidence=consult.manipulation_confidence,
+                    liquidity_state=stb.recent_sweep or "NONE",
+                    statistical_context=consult.statistical_regime,
+                    autocorrelation=consult.statistical_autocorrelation,
+                    efficiency_ratio=consult.statistical_efficiency_ratio,
+                    volatility_ratio=consult.statistical_volatility_ratio,
+                    previous_regime="UNKNOWN", bars_in_regime=1, transition=False,
+                    allowed_regimes=tuple(sorted(allowed or ())),
+                    regime_gate="PASS" if regime_pass else "REJECT",
+                    veto_reason=regime_reason,
+                    stb_state=stb.short_term_bias, stb_confidence=stb.confidence,
+                    displacement_gate=("PASS" if (not trigger.requires_displacement
+                                                   or consult.displacement_confirmed)
+                                       else "FAIL"),
+                    session_state=sess.window_name,
+                    source_bar_m5_utc=(df_m1["time"].iloc[-1].isoformat()
+                                       if df_m1 is not None else None),
+                    source_bar_m15_utc=m15_time, source_bar_h1_utc=h1_time,
+                    source_bar_h4_utc=None,
+                )
+                self.regime_evidence.record(snapshot)
+            except Exception as exc:
+                logger.warning(f"SA {symbol}: regime evidence failed: {exc}")
             if allowed is None:
                 logger.info(
                     f"SA {symbol}: CONSUL Gate 1 BLOCKED — trigger "
@@ -1277,7 +1458,9 @@ class ScalperAgent:
                 return
 
             # Gate 3 — LIA TP2 Override
-            if consult.lia_tp2_override and trigger.fvg_entry is None and trigger.htf_crt is None and trigger.session_sweep is None:
+            if (consult.lia_tp2_override and trigger.fvg_entry is None
+                    and trigger.htf_crt is None and trigger.session_sweep is None
+                    and getattr(trigger, "s01", None) is None):
                 trigger.tp2 = consult.lia_tp2_override
                 logger.info(
                     f"SA {symbol}: CONSUL Gate 3 — TP2 realigned to macro H1 pool "
@@ -1372,6 +1555,10 @@ class ScalperAgent:
                 logger.warning(f"SA {symbol}: candidate telemetry failed: {e}")
             logger.info("SA DRY RUN: Signal generated but not executed.")
             self._log_trade(symbol, trigger, sess, lot_size, ticket=None)
+            if trigger.pullback:
+                self._pullbacks.transition(trigger.pullback, 'MISSED_ENTRY', 'DRY_RUN_NO_SUBMISSION')
+                self._pullbacks.save()
+            funnel_terminal("DRY_RUN_ENTRY", "SIMULATED_ENTRY")
             return
 
         ticket = self._execute_trade(
@@ -1382,6 +1569,8 @@ class ScalperAgent:
                                 "broker did not return a ticket", now)
             funnel_terminal("EXECUTE_FAIL", values=self._sweep_runtime_record(trigger))
         if ticket:
+            if trigger.trigger_type == "S01_REFERENCE_CANDLE_RAID_VP":
+                self._s01_engines[symbol].mark_executed(now)
             self.pool.register_open()
             self._open_trades[ticket] = {
                 "symbol": symbol,
@@ -1435,6 +1624,7 @@ class ScalperAgent:
                 "m15_fvg": trigger.fvg_entry.record() if trigger.fvg_entry else None,
                 "htf_crt": trigger.htf_crt.record() if trigger.htf_crt else None,
                 "session_sweep": trigger.session_sweep.record() if trigger.session_sweep else None,
+                "pullback": trigger.pullback.record() if trigger.pullback else None,
                 "regime": consult.regime,
                 "lots": lot_size,
                 # Cost and risk as they stood at entry. The forensic pass
@@ -1458,10 +1648,15 @@ class ScalperAgent:
         """Serialize already-known tags; the worker performs all enrichment."""
         vplr = _vplr_record(trigger) or {}
         ss_plan = getattr(trigger, "session_sweep", None)
+        s01_data = (getattr(getattr(trigger, "s01", None), "record", lambda: {})()
+                    if getattr(trigger, "s01", None) is not None else {})
+        s01 = s01_data.get("telemetry", s01_data)
         entry_price = float(trigger.entry_price)
         risk = abs(entry_price - float(trigger.stop_loss))
         opposing = abs(float(trigger.tp1) - entry_price) / risk if risk else None
-        raw_event = str(getattr(stb, "recent_sweep", "") or "NONE").upper()
+        raw_event = (f"D1_{s01.get('reference', {}).get('liquidity_side')}_RAID"
+                     if s01 else
+                     str(getattr(stb, "recent_sweep", "") or "NONE").upper())
         allowed_events = {
             "D1_BSL_RAID", "D1_SSL_RAID", "W1_BSL_RAID", "W1_SSL_RAID",
             "MN1_BSL_RAID", "MN1_SSL_RAID", "INTERNAL_SWEEP", "NONE",
@@ -1471,7 +1666,8 @@ class ScalperAgent:
                  raw_event if raw_event in allowed_events else
                  "INTERNAL_SWEEP" if "SWEEP" in raw_event else "NONE")
         raid_time_msc = None
-        raid_time = ss_plan.raid_at if ss_plan else vplr.get("raid_time")
+        raid_time = (s01.get("raid_start") if s01 else
+                     ss_plan.raid_at if ss_plan else vplr.get("raid_time"))
         if raid_time:
             try:
                 parsed = datetime.fromisoformat(str(raid_time).replace("Z", "+00:00"))
@@ -1479,10 +1675,12 @@ class ScalperAgent:
             except ValueError:
                 pass
         vp_level = str(vplr.get("vp_level") or "").upper()
-        location = vp_level if vp_level in {"POC", "VAH", "VAL"} else (
+        location = (s01.get("selected_entry_model") if s01 else
+                    vp_level if vp_level in {"POC", "VAH", "VAL"} else (
             "FVG" if getattr(trigger, "fvg_entry", None)
-            or getattr(trigger, "htf_crt", None) else "OTHER")
-        raid_depth_atr = vplr.get("sweep_depth_atr")
+            or getattr(trigger, "htf_crt", None) else "OTHER"))
+        raid_depth_atr = (s01.get("raid_depth_atr") if s01 else
+                          vplr.get("sweep_depth_atr"))
         session_start = None
         if sess.window is not None:
             session_start = now.replace(
@@ -1497,17 +1695,26 @@ class ScalperAgent:
             "config_era": DP.CONFIG_ERA,
             "liquidity_event_type": event,
             "liquidity_event_raw": raw_event,
-            "reference_tf": f"SESSION_{ss_plan.session}" if ss_plan else vplr.get("profile_type") or "UNKNOWN",
-            "reference_level": (f"{ss_plan.session}_{ss_plan.side}"
+            "reference_tf": ("D1" if s01 else
+                             f"SESSION_{ss_plan.session}" if ss_plan else
+                             vplr.get("profile_type") or "UNKNOWN"),
+            "reference_level": (s01.get("reference", {}).get("reference_id") if s01 else
+                                f"{ss_plan.session}_{ss_plan.side}"
                                 if ss_plan else vplr.get("level_source") or "UNKNOWN"),
             "raid_depth_atr": raid_depth_atr,
-            "raid_depth_spreads": None,
+            "raid_depth_spreads": s01.get("raid_depth_spreads") if s01 else None,
             "reclaim_bars": None,
-            "failed_acceptance": None,
-            "m15_mss": bool(vplr.get("mss_time")) or None,
-            "m5_mss": True if ss_plan else None,
-            "entry_location": location,
-            "opposing_liquidity_distance_R": opposing,
+            "failed_acceptance": bool(s01) if s01 else None,
+            "m15_mss": (bool(s01.get("m15_mss")) if s01 else
+                        bool(vplr.get("mss_time")) or None),
+            "m5_mss": (bool(s01.get("m5_mss")) if s01 else
+                       True if ss_plan else None),
+             "entry_location": location,
+             "market_location": _market_location_record(trigger),
+             "location_permission": _location_permission_record(trigger),
+             "reaction_state": getattr(trigger, "reaction_state", "NO_REACTION"),
+             "confirmation_state": getattr(trigger, "confirmation_state", "NONE"),
+             "opposing_liquidity_distance_R": opposing,
             "news_mode": "CLEAR",
             "raid_session": ss_plan.session if ss_plan else "UNKNOWN",
             "entry_session": self.session.vp_window_name(now),
@@ -1618,6 +1825,8 @@ class ScalperAgent:
                 trigger_type="SWEEP_REJECTION",
                 swept_level=trigger.swept_level,
                 triggered_at=original_permission.triggered_at,
+                confirmation_frame=df_m5,
+                sweep_time=getattr(trigger, "sweep_time", None),
                 frozen_location=original_permission.frozen)
             permission = evaluate_sweep_reaction(
                 permission, df_m5,
@@ -1687,6 +1896,34 @@ class ScalperAgent:
             price      = tick.ask if trigger.direction == "BULLISH" else tick.bid
             point      = info.point
 
+            pullback = getattr(trigger, 'pullback', None)
+            if getattr(self, 'tracked_pullback_enabled', False) and not TP.native(trigger) and not pullback:
+                logger.warning('PULLBACK_MISSING_FINAL_EVIDENCE')
+                return None
+            if pullback:
+                account = mt5.account_info()
+                final_now = datetime.now(timezone.utc)
+                if (not account or account.login != SS.EXPECTED_LOGIN
+                        or account.server != SS.EXPECTED_SERVER
+                        or not 0 <= final_now.timestamp()-tick.time <= 60
+                        or not 0 < tick.bid <= tick.ask):
+                    return None
+                self._pullbacks.advance(symbol,
+                    self._get_ohlcv(symbol, self.TF_TRIGGER, bars=self.TRIGGER_BARS),
+                    self._get_ohlcv(symbol, self.TF_CONFIRM, bars=self.CONFIRM_BARS),
+                    final_now, tick.bid, tick.ask)
+                if not pullback.quote_allowed(price, final_now):
+                    return None
+                quoted = replace(trigger, entry_price=price)
+                valid, why = self.trigger_eng.step3_validate(quoted,
+                    (tick.ask-tick.bid)/point/10., symbol,
+                    sl_pips=abs(price-trigger.stop_loss)/point/10.)
+                if not valid:
+                    return None
+                lot_size = min(lot_size, self._calculate_lots(symbol, quoted))
+                if lot_size <= 0:
+                    return None
+
             ss_plan = getattr(trigger, "session_sweep", None)
             if ss_plan:
                 account = mt5.account_info()
@@ -1707,6 +1944,33 @@ class ScalperAgent:
                 if lot_size <= 0:
                     return None
 
+            # S01 is a market entry after the first fresh M5 POI return.  The
+            # final executable quote must still clear the same cost geometry;
+            # do not silently submit the stale signal price.
+            if getattr(trigger, "s01", None) is not None:
+                frozen_zone = ((getattr(trigger.s01, "telemetry", None) or {})
+                               .get("m5_entry_zone"))
+                if (not frozen_zone or
+                        not float(frozen_zone[0]) <= float(price) <= float(frozen_zone[1])):
+                    logger.warning(
+                        "SA %s: EXECUTABLE_QUOTE_LEFT_ENTRY_ZONE price=%s zone=%s",
+                        symbol, price, frozen_zone)
+                    self.rejects.record("EXECUTABLE_QUOTE_LEFT_ENTRY_ZONE", symbol,
+                                        str({"price": price, "zone": frozen_zone}),
+                                        datetime.now(timezone.utc))
+                    return None
+                quoted_trigger = replace(trigger, entry_price=price)
+                valid, why = self.trigger_eng.step3_validate(
+                    quoted_trigger, (tick.ask - tick.bid) / point / 10.0,
+                    symbol, sl_pips=abs(price - trigger.stop_loss) / point / 10.0)
+                if not valid:
+                    logger.warning(f"SA {symbol}: S01_FINAL_COST_GATE — {why}")
+                    return None
+                lot_size = min(lot_size,
+                               self._calculate_lots(symbol, quoted_trigger))
+                if lot_size <= 0:
+                    return None
+
             crt_plan = getattr(trigger, "htf_crt", None)
             fvg_plan = crt_plan or getattr(trigger, "fvg_entry", None)
             quote_guard = ((lambda p, q: crt_quote_allowed(p, q, datetime.now(timezone.utc)))
@@ -1724,8 +1988,8 @@ class ScalperAgent:
                     logger.warning(f"SA {symbol}: {family}_FINAL_COST_GATE — {why}")
                     return None
 
-            if (getattr(self, "reclaim_fvg_enabled", False)
-                    and getattr(trigger, "session_sweep", None) is None):
+            if TP.legacy_required(getattr(self, 'reclaim_fvg_enabled', False),
+                                  getattr(self, 'tracked_pullback_enabled', False), trigger):
                 permission = getattr(trigger, "reclaim", None)
                 if permission is None or not entry_in_reclaim_zone(permission, price):
                     logger.warning(f"SA {symbol}: RECLAIM_QUOTE_MOVED — skip entry at {price}")
@@ -1797,7 +2061,8 @@ class ScalperAgent:
                 "tp":        tp,
                 "deviation": 10,
                 "magic":     MAGIC_SCALPER,
-                "comment":   (SS.ORDER_PREFIX + ss_plan.setup_id if ss_plan else
+                "comment":   (pullback.comment() if pullback else
+                              SS.ORDER_PREFIX + ss_plan.setup_id if ss_plan else
                               DP.CRT_ORDER_PREFIX + crt_plan.setup_id if crt_plan else
                               DP.M15_FVG_ORDER_COMMENT if fvg_plan else
                               f"SA_{trigger.trigger_type[:4]}"),
@@ -1810,6 +2075,8 @@ class ScalperAgent:
             submit_clock = time.perf_counter_ns()
             if ss_plan and not SS.reserve_attempt(self._session_sweep_attempt_dir, ss_plan.setup_id):
                 logger.warning(f"SA {symbol}: SESSION_SWEEP_ALREADY_ATTEMPTED {ss_plan.setup_id}")
+                return None
+            if pullback and not self._pullbacks.reserve(pullback.setup_id, price, datetime.now(timezone.utc)):
                 return None
             result = mt5.order_send(request)
             confirm_time = datetime.now(timezone.utc)
@@ -1956,9 +2223,16 @@ class ScalperAgent:
                         observed_time=now)
             except Exception as e:
                 logger.warning(f"SA: settled-exit telemetry failed for {ticket}: {e}")
+            settled_close_time = self._settled_close_time(ticket)
+            # The requested timestamp correction applies to the winning
+            # cooldown. Keep the legacy observation-time behavior for losses
+            # and breakevens so their cooldown policies remain unchanged.
+            close_time = (
+                settled_close_time if pnl > 0 and settled_close_time else now
+            )
             self._on_trade_closed(
                 ticket, outcome or ("WIN_TP1" if pnl > 0 else "LOSS"),
-                pnl, now)
+                pnl, close_time)
             return True
 
         waiting_since = info.setdefault("settle_wait_since", now)
@@ -2358,7 +2632,11 @@ class ScalperAgent:
             sa_pool_risk_pct = round(self.pool.risk_pct * 100, 2),
             sa_state_after   = self.state_mach.state.value,
             ticket           = ticket,
-            notes            = ("SESSION_SWEEP " + json.dumps(trigger.session_sweep.record())
+            notes            = ("TRACKED_PULLBACK " + json.dumps(trigger.pullback.record())
+                                if getattr(trigger, 'pullback', None) else
+                                "S01 " + json.dumps(trigger.s01.record())
+                                if getattr(trigger, "s01", None) else
+                                "SESSION_SWEEP " + json.dumps(trigger.session_sweep.record())
                                 if getattr(trigger, "session_sweep", None) else
                                 "HTF_CRT_SWEEP " + json.dumps(trigger.htf_crt.record())
                                 if getattr(trigger, "htf_crt", None) else
@@ -2368,6 +2646,31 @@ class ScalperAgent:
         self.trade_log.log_open(record)
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _watch_pullbacks(self, now):
+        """Lifecycle watch precedes session/cooldown gates; never submits."""
+        self._pullback_ready = False
+        account = mt5.account_info()
+        if (not account or account.login != SS.EXPECTED_LOGIN
+                or account.server != SS.EXPECTED_SERVER):
+            return
+        try:
+            if not self._pullbacks.reconciled:
+                orders = mt5.orders_get()
+                deals = mt5.history_deals_get(now-timedelta(days=7), now)
+                self._pullbacks.reconcile(orders, deals)
+            if not self._pullbacks.reconciled:
+                return
+            for symbol in self.symbols:
+                tick = mt5.symbol_info_tick(symbol)
+                fresh = tick is not None and 0 <= now.timestamp()-tick.time <= 60
+                self._pullbacks.advance(symbol,
+                    self._get_ohlcv(symbol, self.TF_TRIGGER, bars=self.TRIGGER_BARS),
+                    self._get_ohlcv(symbol, self.TF_CONFIRM, bars=self.CONFIRM_BARS), now,
+                    tick.bid if fresh else None, tick.ask if fresh else None)
+            self._pullback_ready = True
+        except Exception:
+            logger.exception('PULLBACK_RECOVERY_BLOCKED')
 
     def _session_sweep_candidate(self, symbol, m5, now):
         if symbol != "XAUUSD":
@@ -2796,6 +3099,32 @@ class ScalperAgent:
                 time.sleep(self.PNL_SETTLE_DELAY_S)
         return None
 
+    def _settled_close_time(self, ticket: int) -> Optional[datetime]:
+        """Return the latest broker closing-deal timestamp for ``ticket``.
+
+        The polling loop can observe a vanished position after the broker has
+        already closed it. Cooldown and journal timestamps must use the
+        broker's exit time, rather than the later observation time, whenever
+        the settled closing deal supplies one.
+        """
+        entry_out = getattr(mt5, "DEAL_ENTRY_OUT", 1)
+        close_times = []
+        for deal in self._position_deals(ticket):
+            if getattr(deal, "entry", None) != entry_out:
+                continue
+            raw_msc = getattr(deal, "time_msc", None)
+            raw_s = getattr(deal, "time", None)
+            try:
+                if raw_msc is not None and float(raw_msc) > 0:
+                    close_times.append(datetime.fromtimestamp(
+                        float(raw_msc) / 1000.0, tz=timezone.utc))
+                elif raw_s is not None and float(raw_s) > 0:
+                    close_times.append(datetime.fromtimestamp(
+                        float(raw_s), tz=timezone.utc))
+            except (TypeError, ValueError, OverflowError, OSError):
+                continue
+        return max(close_times) if close_times else None
+
     def _perform_daily_reset(self):
         logger.info("SA: Performing daily reset protocol")
         now = datetime.now(timezone.utc)
@@ -3004,6 +3333,8 @@ def main():
                         help="L-016: require the sweeping candle's wick to be "
                              "at least --sweep-wick-ratio of its own range "
                              "before SWEEP_REJECTION is admitted")
+    parser.add_argument('--tracked-pullback', action='store_true',
+                        help='Opt-in persistent M15 break/POI/M5 rejection model; default off')
     parser.add_argument("--reclaim-fvg", action=argparse.BooleanOptionalAction,
                         default=DP.RECLAIM_FVG_ENABLED,
                         help="Require displacement reclaim and a subsequent FVG return "
@@ -3038,6 +3369,12 @@ def main():
                              "anchored H4 volume-profile level, confirmed by an "
                              "M5 MSS. Highest trigger priority when on. "
                              "Mirrors backtest_scalper.py.")
+    parser.add_argument("--s01", dest="s01",
+                        action=argparse.BooleanOptionalAction,
+                        default=DP.S01_ENABLED,
+                        help="Enable S01_REFERENCE_CANDLE_RAID_VP: immutable D1 "
+                             "reference raid, frozen M15 raid-leg VP and M5 "
+                             "FVG/OB execution. Default off pending replay.")
     parser.add_argument("--vplr-session-override", dest="vplr_session_override",
                         action=argparse.BooleanOptionalAction,
                         default=DP.VPLR_SESSION_OVERRIDE_ENABLED,
@@ -3045,21 +3382,31 @@ def main():
                              f"scan during {DP.VPLR_SESSION_WINDOW_UTC[0]}-"
                              f"{DP.VPLR_SESSION_WINDOW_UTC[1]} UTC. Existing "
                              "triggers keep their own windows unchanged.")
+    parser.add_argument("--manual-vp-levels", default="",
+                        help="Time-bounded operator levels, e.g. "
+                             "POC=4331,VAL=4314. Uses the full VPLR "
+                             "confirmation and risk chain.")
+    parser.add_argument("--manual-vp-expiry", default="",
+                        help="Timezone-aware ISO expiry for --manual-vp-levels, "
+                             "e.g. 2026-09-14T16:00:00+00:00")
     parser.add_argument("--allow-whole-day", action="store_true",
                         help="Enable the 00:00-23:00 catch-all session window "
                              "(demo plumbing only; disables kill-zone gating)")
     parser.add_argument("--no-cooldown", action="store_true",
                         help="Disable the post-trade cooldown switch entirely")
-    parser.add_argument("--win-cooldown-min", type=float, default=5.0,
-                        help="Break after a winning trade, in minutes (default: 5)")
-    parser.add_argument("--session-sweep", action="store_true",
-                        help="Enable completed-session sweep/reclaim/M5 MSS trigger (research; default off)")
+    parser.add_argument("--win-cooldown-min", type=float,
+                        default=DEFAULT_WIN_COOLDOWN_MINUTES,
+                        help="Break after a winning trade, in minutes (default: 15)")
+    parser.add_argument("--session-sweep", action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help="Enable completed-session sweep/reclaim/M5 MSS trigger (default on)")
     parser.add_argument("--session-liquidity-vault", default=SS.DEFAULT_VAULT,
                         help="Read-only source of session ledger and CSV")
-    parser.add_argument("--triggers", type=str, default=None,
+    parser.add_argument("--triggers", type=str,
+                        default="SWEEP_REJECTION,SESSION_SWEEP,VP_LIQUIDITY_REACTION,VALUE_AREA_FADE,HTF_CRT_SWEEP,FVG_FILL,BOS_RETEST,JUDAS",
                         help="Comma-separated trigger whitelist "
-                             "(SWEEP_REJECTION,FVG_FILL,BOS_RETEST,JUDAS). "
-                             "Default: all four.")
+                             "(SWEEP_REJECTION,FVG_FILL,BOS_RETEST,JUDAS,SESSION_SWEEP,VP_LIQUIDITY_REACTION,VALUE_AREA_FADE). "
+                             "SWEEP_REJECTION is ACTIVE-location gated by default.")
     parser.add_argument("--sessions", type=str, default=None,
                         help="Comma-separated session whitelist (LONDON_OPEN,"
                              "PRE_LONDON,LONDON_NY,TOKYO_OPEN,NY_LUNCH_REV). "
@@ -3089,6 +3436,17 @@ def main():
             args.sweep_location_config, require_active=sweep_required)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(f"SWEEP_REJECTION named-liquidity policy failed to load: {exc}")
+
+    try:
+        manual_vp_levels = parse_manual_levels(args.manual_vp_levels) if args.manual_vp_levels else ()
+        manual_vp_expiry = (datetime.fromisoformat(args.manual_vp_expiry.replace("Z", "+00:00"))
+                            if args.manual_vp_expiry else None)
+        if bool(manual_vp_levels) != bool(manual_vp_expiry):
+            parser.error("--manual-vp-levels and --manual-vp-expiry must be supplied together")
+        if manual_vp_expiry is not None and manual_vp_expiry.tzinfo is None:
+            parser.error("--manual-vp-expiry must include a UTC offset")
+    except ValueError as exc:
+        parser.error(str(exc))
 
     if not _acquire_single_instance_lock():
         logger.error(
@@ -3147,7 +3505,10 @@ def main():
         pdr_gate_enabled     = args.pdr_gate,
         pdr_gate_mode        = args.pdr_gate_mode,
         vplr_enabled         = args.vplr,
+        s01_enabled          = args.s01,
         vplr_session_override= args.vplr_session_override,
+        vplr_manual_levels   = manual_vp_levels,
+        vplr_manual_expiry   = manual_vp_expiry,
         leg_conf_enabled     = args.leg_conf,
         leg_conf_mode        = args.leg_conf_mode,
         session_sweep_enabled= args.session_sweep,
@@ -3155,6 +3516,7 @@ def main():
         sweep_wick_filter    = args.sweep_wick_filter,
         sweep_wick_ratio     = args.sweep_wick_ratio,
         reclaim_fvg_enabled  = args.reclaim_fvg,
+        tracked_pullback_enabled = args.tracked_pullback,
         m15_fvg_entry_enabled= args.m15_fvg_entry,
         htf_crt_enabled      = args.htf_crt,
         crt_confluence_mode  = args.crt_confluence_mode,

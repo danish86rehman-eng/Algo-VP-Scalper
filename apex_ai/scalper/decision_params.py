@@ -312,7 +312,7 @@ VA_FADE_MIN_WICK_FRAC = 0.33
 VA_FADE_SL_BUFFER_FRAC = 0.05
 
 #: Master switch. Default OFF pending the fold test.
-VA_FADE_ENABLED = False
+VA_FADE_ENABLED = True
 
 
 # -- Previous-day-range location gate ----------------------------------------
@@ -461,7 +461,7 @@ VPLR_SCOPES = ("ASIA_ONLY", "ALL_SESSIONS")
 #: docs/DESIGN_VP_LIQUIDITY_REACTION.md §9 clears disjoint-window folds.
 #: With this False the trigger is not constructed, not evaluated, and the
 #: VP_ONLY state is unreachable — asserted by test, not by inspection.
-VPLR_ENABLED = False
+VPLR_ENABLED = True
 
 #: Regimes this trigger may fire in. A raid-and-reverse is the MANIPULATION play
 #: and lives naturally in ROTATION; EXPANSION is included because the raid that
@@ -474,6 +474,35 @@ VPLR_REGIMES = frozenset({"MANIPULATION", "ROTATION", "EXPANSION"})
 #: lives with the rest of the trigger's parameters; done at all because Gate 1
 #: blocks any trigger type absent from the map.
 TRIGGER_REGIME_WHITELIST["VP_LIQUIDITY_REACTION"] = VPLR_REGIMES
+
+
+# -- S01_REFERENCE_CANDLE_RAID_VP -------------------------------------------
+# A stateful, opt-in strategy.  It is deliberately separate from the existing
+# H4 VP experiments: its profile is built once from the completed M15 leg that
+# delivered price into an untouched D1 reference liquidity pool.
+S01_ENABLED = False
+S01_MIN_RAID_DEPTH_ATR = 0.05
+S01_MIN_RAID_DEPTH_SPREADS = 1.5
+S01_ACCEPTANCE_BARS = 2
+S01_M15_ATR_PERIOD = 14
+S01_M5_ATR_PERIOD = 14
+S01_SWING_LOOKBACK = 3
+S01_M5_SWING_LOOKBACK = 2
+S01_DISPLACEMENT_ATR = 0.80
+S01_M5_DISPLACEMENT_ATR = 0.80
+S01_ENTRY_ZONE_ATR = 0.15
+S01_SL_BUFFER_ATR = 0.10
+S01_TARGET_BINS = 40
+S01_VALUE_AREA_PCT = 0.70
+S01_MAX_SETUP_BARS = 48
+S01_MAX_M5_WAIT_BARS = 18
+S01_STATE_DIR = "logs/s01_state"
+
+# S01 is a failed-auction reversal and therefore belongs to the same broad
+# regime family as the existing sweep/VPLR reversal triggers.  This whitelist
+# is only consulted by the existing downstream regime gate after S01 matures.
+TRIGGER_REGIME_WHITELIST["S01_REFERENCE_CANDLE_RAID_VP"] = frozenset(
+    {"MANIPULATION", "ROTATION", "EXPANSION"})
 
 
 # ── Trade Guardian exit management ────────────────────────────────────────────
@@ -596,6 +625,15 @@ MARKET_LOCATION_M5_MSS_LOOKBACK = 120
 MARKET_LOCATION_M5_MSS_SWING_LOOKBACK = 2
 MARKET_LOCATION_ACCEPTANCE_BARS = 2
 MARKET_LOCATION_SWEEP_EXPIRY_MINUTES = 120
+# Operator-approved live-test rule: once an authoritative W1/H4 POC is the
+# active location, the existing M5 SWEEP_REJECTION candle is the confirmation.
+# Do not wait for a second displacement/MSS event at the equilibrium level.
+MARKET_LOCATION_POC_SWEEP_DIRECT_ENTRY = True
+# POC-bin matching is deliberately small and profile-relative.  The runtime
+# caps this pad by both ATR and half a histogram bin; it is not a fixed-dollar
+# widening and does not admit arbitrary HVNs/reference profiles.
+MARKET_LOCATION_POC_ZONE_PAD_ATR = 0.10
+MARKET_LOCATION_POC_ZONE_PAD_BINS = 0.50
 
 
 # ── Sweep-candle wick qualification (L-016) ──────────────────────────────────

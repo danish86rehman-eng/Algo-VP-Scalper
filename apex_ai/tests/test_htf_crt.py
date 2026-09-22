@@ -231,7 +231,7 @@ class CRTIntegrationTests(unittest.TestCase):
              patch.object(sim.mt5, "order_send", side_effect=AssertionError("No orders in backtest")), \
              patch.object(sim.ShortTermBiasFilter, "check", return_value=NS(allow=True, confidence="HIGH",
                  reason="fixture", short_term_bias="BULLISH", htf_trend="BULLISH", recent_sweep=None)), \
-             patch.object(sim, "_apply_v1_council_gates", side_effect=lambda s, t, *args: (t, "")), \
+             patch.object(sim, "_apply_v1_council_gates", side_effect=lambda s, t, *args, **kwargs: (t, "")), \
              patch.object(sim, "_schedule_exit", return_value=(103., "TIMEOUT", "fixture", now, None)):
             r = sim.run_backtest(["XAUUSD"], now, now, 1000., .03, 1, 2.5, True, False,
                  htf_crt_enabled=True, enabled_triggers=["HTF_CRT_SWEEP"], tga_exits=False,

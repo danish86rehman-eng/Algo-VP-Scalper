@@ -19,7 +19,8 @@ from scalper.location_permission import (  # noqa: E402
 from scalper.candidate_funnel import CandidateFunnelRecorder  # noqa: E402
 from scalper.market_location import (  # noqa: E402
     AT_POC, AT_VAL, AT_VAH, AT_MAJOR_RESISTANCE, AT_MAJOR_SUPPORT,
-    MID_RANGE_NO_LOCATION, MarketLocationSnapshot, SRZone,
+    MID_RANGE_NO_LOCATION, MarketLocationSnapshot, ProfileRecord, SRZone,
+    VolumeProfile, PROFILE_ACTIVE,
 )
 from scalper.trigger_engine import MicroLiquidity, SATrigger, SATriggerEngine  # noqa: E402
 
@@ -81,6 +82,37 @@ def value_snapshot(kind, price, event="NO_VALUE_EVENT"):
         distance_to_val_atr=abs(price - 99.0),
         active_profile_id="VP-A", active_profile_timeframe="M15",
         value_area_event=event,
+    )
+
+
+def top_down_poc_snapshot(price=100.0, vp_state="INSIDE_VALUE"):
+    def profile(profile_id, timeframe, poc):
+        raw = VolumeProfile(
+            poc=poc, vah=poc + 10.0, val=poc - 10.0,
+            profile_high=poc + 20.0, profile_low=poc - 20.0,
+            bin_size=4.0, bin_count=10, total_volume=1000.0,
+            value_area_volume=700.0, bars_used=20)
+        return ProfileRecord(
+            profile_id=profile_id, status=PROFILE_ACTIVE,
+            timeframe=timeframe, profile=raw, profile_start=T0.isoformat(),
+            profile_end=(T0 + timedelta(hours=1)).isoformat(),
+            profile_high=poc + 20.0, profile_low=poc - 20.0,
+            direction="UP", total_volume=1000.0, data_quality="TICK_VOLUME",
+            source="TEST", high_volume_nodes=(poc + 12.0,))
+
+    w1 = profile("W1-POC", "W1", 100.0)
+    h4 = profile("H4-POC", "H4", 200.0)
+    return MarketLocationSnapshot(
+        symbol="XAUUSD", as_of=(T0 + timedelta(hours=1)).isoformat(),
+        current_price=price, atr=1.0, location_type=vp_state,
+        vp_state=vp_state, sr_state="UNKNOWN_LOCATION",
+        nearest_poc=100.0, distance_to_poc_atr=abs(price - 100.0),
+        active_profile_id="H4-POC", active_profile_timeframe="H4",
+        profiles=(w1, h4), top_down_available=True,
+        w1_profile_id="W1-POC", w1_poc=100.0,
+        distance_to_w1_poc_atr=abs(price - 100.0),
+        h4_profile_id="H4-POC", h4_poc=200.0,
+        distance_to_h4_poc_atr=abs(price - 200.0),
     )
 
 
@@ -185,12 +217,77 @@ class PermissionTests(unittest.TestCase):
         self.assertEqual(on_boundary.permission, ALLOW_LONG)
         self.assertEqual(outside.permission, BLOCK)
 
-    def test_poc_alone_is_context_only(self):
+    def test_poc_alone_is_context_only_when_direct_entry_disabled(self):
         result = build_location_permission(
             value_snapshot(AT_POC, 100.0), direction="BULLISH",
-            trigger_type="SWEEP_REJECTION", swept_level=100.0)
+            trigger_type="SWEEP_REJECTION", swept_level=100.0,
+            config=LocationPermissionConfig(poc_sweep_direct_entry=False))
         self.assertEqual(result.permission, CONTEXT_ONLY)
         self.assertEqual(result.reason, "POC_ONLY_NO_STRUCTURE")
+
+    def test_poc_bullish_sweep_rejection_enters_without_mss(self):
+        base = build_location_permission(
+            value_snapshot(AT_POC, 100.0), direction="BULLISH",
+            trigger_type="SWEEP_REJECTION", swept_level=100.0)
+        result = evaluate_sweep_reaction(
+            base, confirm_frame(True), sweep_time=T0 + timedelta(minutes=45))
+        self.assertEqual(result.permission, ALLOW_LONG)
+        self.assertEqual(result.reason, "POC_SWEEP_REJECTION_CONFIRMED")
+        self.assertEqual(result.confirmation_state, "SWEEP_REJECTION_CONFIRMED")
+        self.assertIsNone(result.mss_level)
+
+    def test_poc_bearish_sweep_rejection_enters_without_mss(self):
+        base = build_location_permission(
+            value_snapshot(AT_POC, 100.0), direction="BEARISH",
+            trigger_type="SWEEP_REJECTION", swept_level=100.0)
+        result = evaluate_sweep_reaction(
+            base, confirm_frame(False), sweep_time=T0 + timedelta(minutes=45))
+        self.assertEqual(result.permission, ALLOW_SHORT)
+        self.assertEqual(result.reason, "POC_SWEEP_REJECTION_CONFIRMED")
+        self.assertEqual(result.confirmation_state, "SWEEP_REJECTION_CONFIRMED")
+        self.assertIsNone(result.mss_level)
+
+    def test_w1_poc_is_independent_of_h4_context_state(self):
+        result = build_location_permission(
+            top_down_poc_snapshot(100.0, vp_state="INSIDE_VALUE"),
+            direction="BULLISH", trigger_type="SWEEP_REJECTION",
+            swept_level=100.0)
+        self.assertEqual(result.permission, ALLOW_LONG)
+        self.assertEqual(result.profile_id, "W1-POC")
+
+    def test_m5_wick_contact_keeps_poc_candidate_after_close_moves_away(self):
+        contact = frame([{
+            "open": 101.0, "high": 104.2, "low": 99.8, "close": 100.2,
+        }], step=5)
+        snapshot = top_down_poc_snapshot(110.0)
+        result = build_location_permission(
+            snapshot, direction="BULLISH", trigger_type="SWEEP_REJECTION",
+            swept_level=100.0, confirmation_frame=contact,
+            sweep_time=contact.time.iloc[0])
+        self.assertEqual(result.permission, ALLOW_LONG)
+        self.assertIn("POC_BIN_CONTACT", result.reasons)
+
+    def test_unrelated_hvn_does_not_become_poc_permission(self):
+        contact = frame([{
+            "open": 112.0, "high": 113.0, "low": 111.0, "close": 112.5,
+        }], step=5)
+        result = build_location_permission(
+            top_down_poc_snapshot(112.5), direction="BULLISH",
+            trigger_type="SWEEP_REJECTION", swept_level=112.0,
+            confirmation_frame=contact, sweep_time=contact.time.iloc[0])
+        self.assertEqual(result.permission, BLOCK)
+
+    def test_frozen_poc_survives_price_movement(self):
+        first = build_location_permission(
+            top_down_poc_snapshot(100.0), direction="BULLISH",
+            trigger_type="SWEEP_REJECTION", swept_level=100.0)
+        later = build_location_permission(
+            top_down_poc_snapshot(110.0), direction="BULLISH",
+            trigger_type="SWEEP_REJECTION", swept_level=100.0,
+            frozen_location=first.frozen)
+        self.assertEqual(first.permission, ALLOW_LONG)
+        self.assertEqual(later.permission, ALLOW_LONG)
+        self.assertIn("FROZEN_LOCATION", later.reasons)
 
     def test_reaction_without_confirmation_is_blocked(self):
         base = build_location_permission(

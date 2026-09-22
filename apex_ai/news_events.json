@@ -1,179 +1,77 @@
 [
   {
-    "time_utc": "2026-09-10T12:15:00Z",
+    "time_utc": "2026-09-22T03:10:00Z",
     "impact": "HIGH",
-    "title": "EUR Main Refinancing Rate",
+    "title": "AUD RBA Gov Bullock Speaks",
     "symbols": [
-      "EURUSD",
-      "EURGBP",
-      "EURJPY",
-      "EURCHF",
-      "EURAUD",
-      "XAUUSD"
-    ]
-  },
-  {
-    "time_utc": "2026-09-10T12:15:00Z",
-    "impact": "HIGH",
-    "title": "EUR Monetary Policy Statement",
-    "symbols": [
-      "EURUSD",
-      "EURGBP",
-      "EURJPY",
-      "EURCHF",
-      "EURAUD",
-      "XAUUSD"
-    ]
-  },
-  {
-    "time_utc": "2026-09-10T12:30:00Z",
-    "impact": "HIGH",
-    "title": "USD Core PPI m/m",
-    "symbols": [
-      "XAUUSD",
-      "XAGUSD",
-      "USOIL",
-      "BTCUSD",
-      "EURUSD",
-      "GBPUSD",
-      "USDJPY",
-      "USDCHF",
-      "USDCAD",
       "AUDUSD",
-      "NZDUSD",
-      "US30",
-      "NAS100",
-      "SPX500"
-    ]
-  },
-  {
-    "time_utc": "2026-09-10T12:30:00Z",
-    "impact": "HIGH",
-    "title": "USD PPI m/m",
-    "symbols": [
-      "XAUUSD",
-      "XAGUSD",
-      "USOIL",
-      "BTCUSD",
-      "EURUSD",
-      "GBPUSD",
-      "USDJPY",
-      "USDCHF",
-      "USDCAD",
-      "AUDUSD",
-      "NZDUSD",
-      "US30",
-      "NAS100",
-      "SPX500"
-    ]
-  },
-  {
-    "time_utc": "2026-09-10T12:45:00Z",
-    "impact": "HIGH",
-    "title": "EUR ECB Press Conference",
-    "symbols": [
-      "EURUSD",
-      "EURGBP",
-      "EURJPY",
-      "EURCHF",
       "EURAUD",
+      "AUDJPY"
+    ]
+  },
+  {
+    "time_utc": "2026-09-24T01:30:00Z",
+    "impact": "HIGH",
+    "title": "AUD Employment Change",
+    "symbols": [
+      "AUDUSD",
+      "EURAUD",
+      "AUDJPY"
+    ]
+  },
+  {
+    "time_utc": "2026-09-24T01:30:00Z",
+    "impact": "HIGH",
+    "title": "AUD Unemployment Rate",
+    "symbols": [
+      "AUDUSD",
+      "EURAUD",
+      "AUDJPY"
+    ]
+  },
+  {
+    "time_utc": "2026-09-24T07:30:00Z",
+    "impact": "HIGH",
+    "title": "CHF SNB Monetary Policy Assessment",
+    "symbols": [
+      "USDCHF",
+      "EURCHF",
+      "CHFJPY",
       "XAUUSD"
     ]
   },
   {
-    "time_utc": "2026-09-11T06:00:00Z",
+    "time_utc": "2026-09-24T07:30:00Z",
     "impact": "HIGH",
-    "title": "GBP GDP m/m",
+    "title": "CHF SNB Policy Rate",
+    "symbols": [
+      "USDCHF",
+      "EURCHF",
+      "CHFJPY",
+      "XAUUSD"
+    ]
+  },
+  {
+    "time_utc": "2026-09-24T08:00:00Z",
+    "impact": "HIGH",
+    "title": "CHF SNB Press Conference",
+    "symbols": [
+      "USDCHF",
+      "EURCHF",
+      "CHFJPY",
+      "XAUUSD"
+    ]
+  },
+  {
+    "time_utc": "2026-09-25T09:15:00Z",
+    "impact": "HIGH",
+    "title": "GBP BOE Gov Bailey Speaks",
     "symbols": [
       "GBPUSD",
       "EURGBP",
       "GBPJPY",
       "GBPCHF",
       "XAUUSD"
-    ]
-  },
-  {
-    "time_utc": "2026-09-11T12:30:00Z",
-    "impact": "HIGH",
-    "title": "USD Core CPI m/m",
-    "symbols": [
-      "XAUUSD",
-      "XAGUSD",
-      "USOIL",
-      "BTCUSD",
-      "EURUSD",
-      "GBPUSD",
-      "USDJPY",
-      "USDCHF",
-      "USDCAD",
-      "AUDUSD",
-      "NZDUSD",
-      "US30",
-      "NAS100",
-      "SPX500"
-    ]
-  },
-  {
-    "time_utc": "2026-09-11T12:30:00Z",
-    "impact": "HIGH",
-    "title": "USD Core CPI y/y",
-    "symbols": [
-      "XAUUSD",
-      "XAGUSD",
-      "USOIL",
-      "BTCUSD",
-      "EURUSD",
-      "GBPUSD",
-      "USDJPY",
-      "USDCHF",
-      "USDCAD",
-      "AUDUSD",
-      "NZDUSD",
-      "US30",
-      "NAS100",
-      "SPX500"
-    ]
-  },
-  {
-    "time_utc": "2026-09-11T12:30:00Z",
-    "impact": "HIGH",
-    "title": "USD CPI m/m",
-    "symbols": [
-      "XAUUSD",
-      "XAGUSD",
-      "USOIL",
-      "BTCUSD",
-      "EURUSD",
-      "GBPUSD",
-      "USDJPY",
-      "USDCHF",
-      "USDCAD",
-      "AUDUSD",
-      "NZDUSD",
-      "US30",
-      "NAS100",
-      "SPX500"
-    ]
-  },
-  {
-    "time_utc": "2026-09-11T12:30:00Z",
-    "impact": "HIGH",
-    "title": "USD CPI y/y",
-    "symbols": [
-      "XAUUSD",
-      "XAGUSD",
-      "USOIL",
-      "BTCUSD",
-      "EURUSD",
-      "GBPUSD",
-      "USDJPY",
-      "USDCHF",
-      "USDCAD",
-      "AUDUSD",
-      "NZDUSD",
-      "US30",
-      "NAS100",
-      "SPX500"
     ]
   }
 ]

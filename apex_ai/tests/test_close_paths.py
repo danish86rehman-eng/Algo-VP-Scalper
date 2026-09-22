@@ -231,6 +231,52 @@ class TestSettledPnl(unittest.TestCase):
         with mock.patch.object(scalper_agent, "mt5", fake):
             self.assertAlmostEqual(agent._settled_pnl(1), 10.75, places=6)
 
+    def test_settled_close_uses_broker_exit_timestamp(self):
+        close_time = datetime(2026, 8, 25, 10, 3, 17, 456000,
+                              tzinfo=timezone.utc)
+        fake = FakeMT5(deals=[
+            deal(FakeMT5.DEAL_ENTRY_IN, commission=-0.5),
+            SimpleNamespace(entry=FakeMT5.DEAL_ENTRY_OUT, profit=12.0,
+                             commission=-0.5, swap=-0.25, position_id=1,
+                             time=int(close_time.timestamp()),
+                             time_msc=int(close_time.timestamp() * 1000)),
+        ])
+        agent = bare_agent()
+        agent._open_trades = {1: {"symbol": "XAUUSD", "direction": "BULLISH",
+                                  "open_time": close_time - timedelta(minutes=3)}}
+        booked = []
+        agent._on_trade_closed = lambda t, outcome, pnl, when=None: \
+            booked.append(when)
+        observed_later = close_time + timedelta(seconds=20)
+        with mock.patch.object(scalper_agent, "mt5", fake):
+            self.assertTrue(agent._book_settled_close(
+                1, agent._open_trades[1], observed_later, outcome="WIN_TP1"))
+
+        self.assertEqual(booked, [close_time])
+
+    def test_loss_settled_close_keeps_observation_timestamp(self):
+        close_time = datetime(2026, 8, 25, 10, 3, 17, 456000,
+                              tzinfo=timezone.utc)
+        fake = FakeMT5(deals=[
+            deal(FakeMT5.DEAL_ENTRY_IN, commission=-0.5),
+            SimpleNamespace(entry=FakeMT5.DEAL_ENTRY_OUT, profit=-12.0,
+                             commission=-0.5, swap=-0.25, position_id=1,
+                             time=int(close_time.timestamp()),
+                             time_msc=int(close_time.timestamp() * 1000)),
+        ])
+        agent = bare_agent()
+        agent._open_trades = {1: {"symbol": "XAUUSD", "direction": "BULLISH",
+                                  "open_time": close_time - timedelta(minutes=3)}}
+        booked = []
+        agent._on_trade_closed = lambda t, outcome, pnl, when=None: \
+            booked.append(when)
+        observed_later = close_time + timedelta(seconds=20)
+        with mock.patch.object(scalper_agent, "mt5", fake):
+            self.assertTrue(agent._book_settled_close(
+                1, agent._open_trades[1], observed_later, outcome="LOSS"))
+
+        self.assertEqual(booked, [observed_later])
+
     def test_no_deals_at_all_returns_none_not_zero(self):
         agent = bare_agent()
         with mock.patch.object(scalper_agent, "mt5", FakeMT5(deals=[])):

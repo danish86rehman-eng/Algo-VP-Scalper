@@ -158,8 +158,12 @@ class SessionSweepTests(unittest.TestCase):
     def test_named_session_trigger_bypasses_unrelated_reclaim_fvg_gate(self):
         live = Path(inspect.getfile(__import__("scalper_agent"))).read_text(encoding="utf-8")
         replay = Path(inspect.getfile(__import__("backtest_scalper"))).read_text(encoding="utf-8")
-        self.assertIn("self.reclaim_fvg_enabled and trigger.session_sweep is None", live)
-        self.assertIn("reclaim_fvg_enabled and trigger.session_sweep is None", replay)
+        from scalper.tracked_pullback import legacy_required
+        from scalper.trigger_engine import SATrigger
+        self.assertIn('TP.legacy_required(', live)
+        self.assertIn('TP.legacy_required(', replay)
+        for tracked in (False, True):
+            self.assertFalse(legacy_required(True, tracked, SATrigger(session_sweep=object())))
 
     def test_execution_account_quote_cost_and_reservation_guards(self):
         import scalper_agent as live
@@ -210,7 +214,8 @@ class LedgerTests(unittest.TestCase):
         (root/"data").mkdir()
         (root/"journal/market").mkdir(parents=True)
         (root/"journal/market/session-liquidity-ledger.md").write_text(
-            f"Last updated: `{now.isoformat()}`\nMT5 account: `172783529`\nMT5 server: `Exness-MT5Real2`\n", encoding="utf-8")
+            f"Last updated: `{now.isoformat()}`\nMT5 account: `{SS.EXPECTED_LOGIN}`\n"
+            f"MT5 server: `{SS.EXPECTED_SERVER}`\n", encoding="utf-8")
         self.write_rows(root, [row])
         return now, row
 

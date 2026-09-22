@@ -41,8 +41,10 @@ M5_CONFIRMATION_NONE = "NONE"
 M5_CONFIRMATION_DISPLACEMENT = "DISPLACEMENT_CONFIRMED"
 M5_CONFIRMATION_MSS = "MSS_CONFIRMED"
 M5_CONFIRMATION_BOTH = "MSS_AND_DISPLACEMENT"
+M5_CONFIRMATION_SWEEP_REJECTION = "SWEEP_REJECTION_CONFIRMED"
 MARKET_LOCATION_OFF = "OFF"
 MARKET_LOCATION_ACTIVE = "ACTIVE"
+AT_POC_ZONE = "AT_POC_ZONE"
 
 
 def normalize_market_location_mode(value: str) -> str:
@@ -63,6 +65,13 @@ class LocationPermissionConfig:
     m5_mss_swing_lookback: int = 2
     acceptance_bars: int = 2
     sweep_expiry_minutes: int = 120
+    poc_sweep_direct_entry: bool = True
+    # POC is stored as the lower edge of its histogram bin.  A small
+    # volatility-normalised pad lets the execution frame touch that bin even
+    # when the chart/broker rounds the displayed POC differently, without
+    # turning the whole value area into a POC location.
+    poc_zone_pad_atr: float = 0.10
+    poc_zone_pad_bins: float = 0.50
 
 
 @dataclass(frozen=True)
@@ -300,6 +309,137 @@ def _vp_candidate(snapshot, direction: str, config: LocationPermissionConfig):
     }
 
 
+def _frame_touches_band(frame, low: float, high: float, *, after=None) -> bool:
+    """Return whether a completed confirmation bar overlaps a price band."""
+    if frame is None or len(frame) == 0 or not {"high", "low"}.issubset(frame.columns):
+        return False
+    work = frame
+    if after is not None and "time" in work.columns:
+        try:
+            times = pd.to_datetime(work["time"], utc=True, errors="coerce")
+            cutoff = pd.Timestamp(after)
+            cutoff = (cutoff.tz_localize("UTC") if cutoff.tzinfo is None
+                      else cutoff.tz_convert("UTC"))
+            work = work.loc[times >= cutoff]
+        except (TypeError, ValueError):
+            return False
+    if len(work) == 0:
+        return False
+    highs = pd.to_numeric(work["high"], errors="coerce").to_numpy()
+    lows = pd.to_numeric(work["low"], errors="coerce").to_numpy()
+    return bool(np.any((lows <= float(high)) & (highs >= float(low))))
+
+
+def _poc_profile(snapshot, profile_id: Optional[str], timeframe: str):
+    """Find the active top-down profile record for POC-bin geometry."""
+    for profile in getattr(snapshot, "profiles", ()):
+        if (getattr(profile, "profile_id", None) == profile_id
+                and getattr(profile, "timeframe", None) == timeframe
+                and getattr(profile, "status", None) == "ACTIVE"):
+            return profile
+    return None
+
+
+def _poc_candidate(snapshot, config: LocationPermissionConfig, *,
+                   swept_level: Optional[float] = None,
+                   confirmation_frame=None, sweep_time=None):
+    """Return an active W1/H4 POC *bin* touched by the setup.
+
+    ``snapshot.vp_state`` describes the current close against the H4 primary
+    profile.  It is not sufficient to decide whether an independent W1 POC
+    was touched, and it loses a wick after the candle closes away.  Match the
+    causal sweep level or completed M5 range against each authoritative
+    profile's own histogram bin instead.
+    """
+    if not getattr(snapshot, "top_down_available", True):
+        return None
+
+    atr_value = float(getattr(snapshot, "atr", 0.0) or 0.0)
+    if atr_value <= 0:
+        return None
+    current_price = float(snapshot.current_price)
+    options = []
+    authoritative = (
+        ("W1", getattr(snapshot, "w1_poc", None),
+         getattr(snapshot, "w1_profile_id", None)),
+        ("H4", getattr(snapshot, "h4_poc", None),
+         getattr(snapshot, "h4_profile_id", None)),
+    )
+    for timeframe, level, profile_id in authoritative:
+        if level is None:
+            continue
+        level = float(level)
+        profile = _poc_profile(snapshot, profile_id, timeframe)
+        raw_bin = getattr(getattr(profile, "profile", None), "bin_size", 0.0)
+        bin_size = float(raw_bin or 0.0)
+        # Synthetic/legacy adapters may expose a POC without profile rows.
+        # Keep their point semantics while live/replay top-down snapshots use
+        # the real histogram-bin geometry.
+        pad = min(atr_value * float(config.poc_zone_pad_atr),
+                  bin_size * float(config.poc_zone_pad_bins)) if bin_size > 0 else (
+                      atr_value * float(config.poc_zone_pad_atr))
+        zone_low = level - pad
+        zone_high = level + (bin_size if bin_size > 0 else 0.0) + pad
+        _, current_distance = _distance_to_band(
+            current_price, zone_low, zone_high, atr_value)
+        swept_distance = None
+        if swept_level is not None:
+            _, swept_distance = _distance_to_band(
+                float(swept_level), zone_low, zone_high, atr_value)
+        contact = _frame_touches_band(
+            confirmation_frame, zone_low, zone_high, after=sweep_time)
+        swept_contact = swept_distance is not None and swept_distance <= config.proximity_atr
+        current_contact = current_distance is not None and current_distance <= config.proximity_atr
+        if not (contact or swept_contact or current_contact):
+            continue
+        options.append({
+            "location_id": f"{profile_id or timeframe}:POC",
+            "kind": AT_POC,
+            "price": level,
+            "low": zone_low,
+            "high": zone_high,
+            "distance_atr": current_distance,
+            "timeframe": timeframe,
+            "profile_id": profile_id,
+            "poc_contact": bool(contact or swept_contact),
+            "contact_priority": 0 if contact else (1 if swept_contact else 2),
+        })
+
+    # Compatibility fallback for unit/test adapters that expose only the
+    # flattened nearest POC.  Live/replay always supplies W1/H4 profiles.
+    if not options and snapshot.nearest_poc is not None:
+        level = float(snapshot.nearest_poc)
+        half = atr_value * float(config.poc_zone_pad_atr)
+        _, distance_atr = _distance_to_band(
+            current_price, level - half, level + half, atr_value)
+        swept_distance = None
+        if swept_level is not None:
+            _, swept_distance = _distance_to_band(
+                float(swept_level), level - half, level + half, atr_value)
+        contact = _frame_touches_band(
+            confirmation_frame, level - half, level + half, after=sweep_time)
+        swept_contact = swept_distance is not None and swept_distance <= config.proximity_atr
+        current_contact = distance_atr is not None and distance_atr <= config.proximity_atr
+        if contact or swept_contact or current_contact:
+            options.append({
+                "location_id": f"{snapshot.active_profile_id or 'VP'}:POC",
+                "kind": AT_POC, "price": level,
+                "low": level - half, "high": level + half,
+                "distance_atr": distance_atr,
+                "timeframe": snapshot.active_profile_timeframe,
+                "profile_id": snapshot.active_profile_id,
+                "poc_contact": bool(contact or swept_contact),
+                "contact_priority": 0 if contact else (1 if swept_contact else 2),
+            })
+    if not options:
+        return None
+    return min(options, key=lambda item: (
+        item["contact_priority"],
+        item["distance_atr"] if item["distance_atr"] is not None else float("inf"),
+        0 if item["timeframe"] == "H4" else 1,
+    ))
+
+
 def _continuation_candidate(snapshot, direction: str,
                             config: LocationPermissionConfig):
     if direction == "BULLISH" and snapshot.vp_state == ABOVE_VALUE:
@@ -369,8 +509,11 @@ def _frozen_location_is_current(snapshot, frozen: FrozenLocation) -> bool:
     flattened = {
         f"{profile_id or 'SR'}:{SUPPORT}": getattr(snapshot, "nearest_support", None),
         f"{profile_id or 'SR'}:{RESISTANCE}": getattr(snapshot, "nearest_resistance", None),
+        f"{profile_id or 'VP'}:POC": getattr(snapshot, "nearest_poc", None),
         f"{profile_id or 'VP'}:VAL": getattr(snapshot, "nearest_val", None),
         f"{profile_id or 'VP'}:VAH": getattr(snapshot, "nearest_vah", None),
+        f"{getattr(snapshot, 'w1_profile_id', None) or 'W1'}:POC": getattr(snapshot, "w1_poc", None),
+        f"{getattr(snapshot, 'h4_profile_id', None) or 'H4'}:POC": getattr(snapshot, "h4_poc", None),
     }
     return location_id in flattened and flattened[location_id] is not None
 
@@ -379,6 +522,8 @@ def build_location_permission(snapshot, *, direction: str, trigger_type: str,
                               swept_level: Optional[float] = None,
                               triggered_at=None,
                               frozen_location: Optional[FrozenLocation] = None,
+                              confirmation_frame=None,
+                              sweep_time=None,
                               config: Optional[LocationPermissionConfig] = None) -> LocationPermission:
     """Return one directional permission from the authoritative snapshot."""
     config = config or LocationPermissionConfig()
@@ -402,6 +547,12 @@ def build_location_permission(snapshot, *, direction: str, trigger_type: str,
         "AT_SUPPORT", "AT_FLIP_SUPPORT")
     structural = _zone_candidate(snapshot, direction, config)
     vp_edge = _vp_candidate(snapshot, direction, config)
+    poc_direct = (_poc_candidate(
+                      snapshot, config, swept_level=swept_level,
+                      confirmation_frame=confirmation_frame,
+                      sweep_time=sweep_time)
+                  if (trigger_type == "SWEEP_REJECTION"
+                      and config.poc_sweep_direct_entry) else None)
     opposite = _zone_candidate(snapshot,
                                "BEARISH" if direction == "BULLISH" else "BULLISH",
                                config)
@@ -410,7 +561,11 @@ def build_location_permission(snapshot, *, direction: str, trigger_type: str,
     } and ((direction == "BULLISH" and snapshot.location_type == VP_SR_SUPPORT_CONFLUENCE)
            or (direction == "BEARISH" and snapshot.location_type == VP_SR_RESISTANCE_CONFLUENCE)))
     reasons = []
-    candidate = structural or vp_edge
+    candidate = poc_direct or structural or vp_edge
+    if poc_direct:
+        reasons.append("POC_SWEEP_DIRECT")
+        if poc_direct.get("poc_contact"):
+            reasons.append("POC_BIN_CONTACT")
     if structural:
         reasons.append(f"{snapshot.active_profile_timeframe or 'SR'}_{role}")
         if structural["kind"] == FLIP:
@@ -440,26 +595,6 @@ def build_location_permission(snapshot, *, direction: str, trigger_type: str,
             rejection_code=acceptance_reason,
             reasons=(acceptance_reason, value_event), swept_level=swept_level,
             sweep_type="SSL" if direction == "BULLISH" else "BSL", **values)
-
-    # POC is an equilibrium reference.  It cannot authorize a reversal
-    # without independent structural or value-edge evidence.
-    poc_only = (snapshot.vp_state == AT_POC and not structural and not vp_edge
-                and not confluence)
-    if poc_only:
-        return LocationPermission(
-            permission=CONTEXT_ONLY, direction=direction,
-            reason="POC_ONLY_NO_STRUCTURE", reasons=("POC_ONLY_NO_STRUCTURE",),
-            swept_level=swept_level,
-            sweep_type="SSL" if direction == "BULLISH" else "BSL", **values)
-
-    # Continuation triggers may use a directional move outside value, but a
-    # reversal trigger must be at a support/resistance or value edge.
-    continuation = trigger_type in {"BOS_RETEST", "FVG_FILL",
-                                    "S01_REFERENCE_CANDLE_RAID_VP"}
-    if not candidate and continuation:
-        candidate = _continuation_candidate(snapshot, direction, config)
-        if candidate:
-            reasons.append(candidate["kind"])
 
     if frozen_location is not None:
         active_ids = {getattr(snapshot, "active_profile_id", None),
@@ -496,8 +631,32 @@ def build_location_permission(snapshot, *, direction: str, trigger_type: str,
                                                 float(snapshot.atr))[1],
             "timeframe": frozen_location.timeframe,
             "profile_id": frozen_location.profile_id,
+            "poc_contact": frozen_location.location_kind in {AT_POC, AT_POC_ZONE},
         }
         reasons.append("FROZEN_LOCATION")
+
+    # POC remains context-only unless the operator-enabled SWEEP_REJECTION
+    # path is active.  That path still requires the detector's completed M5
+    # sweep/rejection candle; it only removes the extra MSS/displacement wait.
+    # A frozen POC is deliberately allowed to survive a later close away from
+    # the bin; profile replacement and expiry are still checked below.
+    poc_only = (snapshot.vp_state == AT_POC and not structural and not vp_edge
+                and not confluence and not poc_direct and frozen_location is None)
+    if poc_only:
+        return LocationPermission(
+            permission=CONTEXT_ONLY, direction=direction,
+            reason="POC_ONLY_NO_STRUCTURE", reasons=("POC_ONLY_NO_STRUCTURE",),
+            swept_level=swept_level,
+            sweep_type="SSL" if direction == "BULLISH" else "BSL", **values)
+
+    # Continuation triggers may use a directional move outside value, but a
+    # reversal trigger must be at a support/resistance or value edge.
+    continuation = trigger_type in {"BOS_RETEST", "FVG_FILL",
+                                    "S01_REFERENCE_CANDLE_RAID_VP"}
+    if not candidate and continuation:
+        candidate = _continuation_candidate(snapshot, direction, config)
+        if candidate:
+            reasons.append(candidate["kind"])
 
     if candidate is None:
         if opposite is not None or sr_state in opposite_sr:
@@ -535,7 +694,9 @@ def build_location_permission(snapshot, *, direction: str, trigger_type: str,
     distance_atr = candidate["distance_atr"]
     if swept_level is not None:
         distance_atr = abs(float(swept_level) - float(candidate["price"])) / max(float(snapshot.atr), 1e-12)
-        if distance_atr > config.proximity_atr:
+        if (distance_atr > config.proximity_atr
+                and not (candidate["kind"] in {AT_POC, AT_POC_ZONE}
+                         and candidate.get("poc_contact", False))):
             return LocationPermission(
                 permission=BLOCK, direction=direction,
                 reason="TOO_FAR_FROM_LOCATION",
@@ -551,8 +712,11 @@ def build_location_permission(snapshot, *, direction: str, trigger_type: str,
     permission = ALLOW_LONG if direction == "BULLISH" else ALLOW_SHORT
     frozen = frozen_location or _freeze(snapshot, candidate, direction, values,
                                          swept_level)
+    permission_reason = ("POC_SWEEP_REJECTION_PENDING"
+                         if candidate["kind"] == AT_POC
+                         else "LOCATION_PERMISSION_GRANTED")
     return LocationPermission(
-        permission=permission, direction=direction, reason="LOCATION_PERMISSION_GRANTED",
+        permission=permission, direction=direction, reason=permission_reason,
         reasons=tuple(dict.fromkeys(reasons)), location_id=candidate["location_id"],
         location_kind=candidate["kind"], location_price=candidate["price"],
         zone_low=candidate["low"], zone_high=candidate["high"],
@@ -577,7 +741,7 @@ def _frame_after(frame, when):
 
 def evaluate_sweep_reaction(permission: LocationPermission, df_confirm,
                             *, sweep_time=None, config=None):
-    """Require M5 reclaim plus existing M5 displacement/MSS evidence."""
+    """Require M5 reclaim; non-POC paths still require displacement/MSS."""
     config = config or LocationPermissionConfig()
     if not permission.executable:
         return permission
@@ -645,6 +809,16 @@ def evaluate_sweep_reaction(permission: LocationPermission, df_confirm,
                        reasons=permission.reasons + ("NO_RECLAIM",))
 
     reaction_state = RECLAIM
+    if (config.poc_sweep_direct_entry
+            and permission.location_kind == AT_POC):
+        confirmation = M5_CONFIRMATION_SWEEP_REJECTION
+        return replace(
+            permission, reason="POC_SWEEP_REJECTION_CONFIRMED",
+            reaction_state=REJECTION,
+            confirmation_state=confirmation,
+            m5_confirmation_state=confirmation,
+            reasons=permission.reasons + ("RECLAIM", confirmation),
+        )
     body = np.abs(closes - opens)
     displacement = directional & (body >= config.m5_displacement_atr * atr_value)
     displacement_idx = np.flatnonzero(displacement)

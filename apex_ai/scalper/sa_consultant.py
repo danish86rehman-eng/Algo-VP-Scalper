@@ -28,6 +28,7 @@ import numpy as np
 logger = logging.getLogger("SA.Consul")
 
 from scalper import decision_params as DP
+from scalper.regime_classifier import RegimeClassifier
 
 #: Momentum floor for "institutional displacement". Gate 2 (BOS_RETEST) needs
 #: displacement, a momentum score at or above this, and a mapped FVG.
@@ -85,6 +86,17 @@ class SAConsultResult:
     snapshot_ts: Optional[datetime] = None
     latency_ms: float = 0.0
     stale_data: bool = False
+    # Observation-only regime components; existing decision fields remain the
+    # sole source of gate behavior.
+    atr_ratio: float = 0.0
+    displacement_momentum_score: float = 0.0
+    structure_trend: str = "RANGING"
+    manipulation_detected: bool = False
+    manipulation_confidence: float = 0.0
+    statistical_regime: str = "UNKNOWN"
+    statistical_autocorrelation: float = 0.0
+    statistical_efficiency_ratio: float = 0.0
+    statistical_volatility_ratio: float = 0.0
 
     def summary(self) -> str:
         return (
@@ -160,6 +172,23 @@ def analyse(symbol: str,
     result.regime_behavior = regime.behavior_state
     result.regime_confidence = regime.confidence
     result.regime_blocks_trade = regime.regime in ("TRANSITION", "ROTATION")
+    result.atr_ratio = regime.atr_ratio
+    result.displacement_momentum_score = displacement.momentum_score
+    result.structure_trend = structure.trend
+    result.manipulation_detected = manip_signal.detected
+    result.manipulation_confidence = manip_signal.confidence
+    # Observation only.  This classifier is not consulted by any live gate.
+    stat = RegimeClassifier(
+        lookback=DP.VP_REGIME_LOOKBACK,
+        smoothing=DP.VP_REGIME_SMOOTHING,
+        trend_threshold=DP.VP_REGIME_TREND_THRESHOLD,
+        vol_threshold=DP.VP_REGIME_VOL_THRESHOLD,
+        er_threshold=DP.VP_REGIME_ER_THRESHOLD,
+    ).classify(df_h1)
+    result.statistical_regime = stat.regime
+    result.statistical_autocorrelation = stat.autocorr
+    result.statistical_efficiency_ratio = stat.efficiency_ratio
+    result.statistical_volatility_ratio = stat.vol_ratio
     return result
 
 
@@ -265,6 +294,21 @@ class SAConsultant:
         # and ROTATION rather than blanket-blocking them.
         logger.debug(f"SA Consul [{symbol}]: {result.summary()}")
         return result
+
+    def observe_frames(self, symbol: str, df_trigger: pd.DataFrame,
+                       df_h1: pd.DataFrame) -> SAConsultResult:
+        """Run the existing context pass on supplied closed frames only.
+
+        Observation API: callers must not use this result to make decisions.
+        """
+        return analyse(
+            symbol, df_trigger, df_h1,
+            structure_engine=self._structure,
+            displacement_engine=self._displacement,
+            liquidity_engine=self._liquidity,
+            manipulation_engine=self._manipulation,
+            regime_engine=self._regime,
+        )
 
     def _apply_lia_override(self, result: SAConsultResult,
                             trigger_direction: str,

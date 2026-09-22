@@ -62,6 +62,7 @@ from scalper.anchored_vp import AnchoredProfile, atr
 LEVEL_POC = "POC"
 LEVEL_VAH = "VAH"
 LEVEL_VAL = "VAL"
+VALID_LEVELS = frozenset({LEVEL_POC, LEVEL_VAH, LEVEL_VAL})
 
 #: Where the raided liquidity came from. Ordered most-institutional first; used
 #: only for telemetry and for the PD/session confluence test.
@@ -76,6 +77,31 @@ SRC_SWING_LOW = "SWING_LOW"
 
 _EXTERNAL_SOURCES = frozenset({SRC_PDH, SRC_PDL,
                                SRC_SESSION_HIGH, SRC_SESSION_LOW})
+
+
+def parse_manual_levels(value: str) -> Tuple[Tuple[str, float], ...]:
+    """Parse ``POC=4331,VAL=4314`` into validated immutable levels."""
+    if not value:
+        return ()
+    levels = []
+    seen = set()
+    for item in value.split(","):
+        try:
+            name, raw_price = item.split("=", 1)
+            name = name.strip().upper()
+            price = float(raw_price.strip())
+        except (TypeError, ValueError):
+            raise ValueError(
+                "manual VP levels must use NAME=PRICE, e.g. POC=4331,VAL=4314")
+        if name not in VALID_LEVELS:
+            raise ValueError(f"unknown manual VP level {name!r}; valid: {sorted(VALID_LEVELS)}")
+        if not np.isfinite(price) or price <= 0:
+            raise ValueError(f"manual VP level {name} must have a finite positive price")
+        if name in seen:
+            raise ValueError(f"manual VP level {name} was supplied more than once")
+        seen.add(name)
+        levels.append((name, price))
+    return tuple(levels)
 
 #: Confluence labels. Kept as constants so the reject log and the tests agree on
 #: spelling and a typo cannot silently drop a confluence.
@@ -163,6 +189,10 @@ class VPLRContext:
     params: VPLRParams
     df_d1_closed: Optional[pd.DataFrame] = None
     htf_trend: str = ""
+    # Operator-supplied profile levels for a time-bounded live watch. These
+    # replace the automatically anchored POC/VAH/VAL locations, while leaving
+    # the raid, reclaim/displacement, MSS and confluence contract unchanged.
+    manual_levels: Tuple[Tuple[str, float], ...] = ()
 
 
 @dataclass
@@ -321,9 +351,10 @@ def _has_order_block(df: pd.DataFrame, disp_idx: Optional[int],
 
 def detect(df_trigger: pd.DataFrame,
            df_confirm: pd.DataFrame,
-           anchored: AnchoredProfile,
+           anchored: Optional[AnchoredProfile],
            liq,
            *,
+           manual_levels: Tuple[Tuple[str, float], ...] = (),
            df_d1_closed: Optional[pd.DataFrame] = None,
            htf_trend: str = "",
            atr_period: int,
@@ -347,13 +378,25 @@ def detect(df_trigger: pd.DataFrame,
     Every frame handed in must contain only CLOSED bars.
     """
     sig = VPLRSignal()
-    if anchored is None or anchored.profile is None or not anchored.profile.valid:
+    manual_levels = tuple(manual_levels or ())
+    if (not manual_levels and
+            (anchored is None or anchored.profile is None or not anchored.profile.valid)):
         sig.reject_reason = "no anchored profile"
         return sig
 
-    sig.poc, sig.vah, sig.val = anchored.poc, anchored.vah, anchored.val
-    sig.anchor_time = anchored.anchor_time
-    sig.anchor_extreme_time = anchored.extreme_time
+    if manual_levels:
+        sig.profile_type = "MANUAL"
+        for name, price in manual_levels:
+            if name == LEVEL_POC:
+                sig.poc = float(price)
+            elif name == LEVEL_VAH:
+                sig.vah = float(price)
+            elif name == LEVEL_VAL:
+                sig.val = float(price)
+    else:
+        sig.poc, sig.vah, sig.val = anchored.poc, anchored.vah, anchored.val
+        sig.anchor_time = anchored.anchor_time
+        sig.anchor_extreme_time = anchored.extreme_time
 
     if df_trigger is None or len(df_trigger) < max(raid_lookback, 20):
         sig.reject_reason = "trigger frame too short"
@@ -367,8 +410,10 @@ def detect(df_trigger: pd.DataFrame,
         sig.reject_reason = "no ATR"
         return sig
 
-    va_width = anchored.profile.value_area_width
-    zone = max(zone_atr * a, zone_va_frac * va_width)
+    # Levels from different supplied profiles do not share a meaningful value
+    # area width, so their interaction zone is volatility-scaled only.
+    zone = (zone_atr * a if manual_levels else
+            max(zone_atr * a, zone_va_frac * anchored.profile.value_area_width))
     if zone <= 0:
         sig.reject_reason = "degenerate zone width"
         return sig
@@ -378,9 +423,10 @@ def detect(df_trigger: pd.DataFrame,
         sig.reject_reason = "no liquidity pools"
         return sig
 
-    vp_levels = ((LEVEL_POC, anchored.poc),
-                 (LEVEL_VAH, anchored.vah),
-                 (LEVEL_VAL, anchored.val))
+    vp_levels = (manual_levels or
+                 ((LEVEL_POC, anchored.poc),
+                  (LEVEL_VAH, anchored.vah),
+                  (LEVEL_VAL, anchored.val)))
 
     entry = float(df_trigger["close"].iloc[-1])
     window = df_trigger.iloc[-raid_lookback:]
@@ -546,13 +592,14 @@ def detect_with_context(df_trigger: pd.DataFrame,
     paths call, so neither of them enumerates the arguments and they cannot
     fall out of step.
     """
-    if ctx is None or ctx.anchored is None:
+    if ctx is None or (ctx.anchored is None and not ctx.manual_levels):
         sig = VPLRSignal()
         sig.reject_reason = "no anchored profile"
         return sig
     p = ctx.params
     return detect(
         df_trigger, df_confirm, ctx.anchored, liq,
+        manual_levels=ctx.manual_levels,
         df_d1_closed=ctx.df_d1_closed,
         htf_trend=ctx.htf_trend,
         atr_period=p.atr_period,

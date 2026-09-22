@@ -92,6 +92,7 @@ class SATrigger:
     # L-017 closed-bar permission, also checked against the final order quote.
     reclaim: object = None
     session_sweep: object = None  # Completed NY-clock session raid evidence
+    pullback: object = None  # Opt-in persistent structural-break entry evidence
     #: Facts-only location context. Never read by selection or execution.
     location_context: object = None
     #: Authoritative VP + structural S/R market-location evidence. This is a
@@ -111,6 +112,8 @@ class SATrigger:
     confirmation_state: str = M5_CONFIRMATION_NONE
     #: The completed trigger-frame candle that performed the liquidity raid.
     sweep_time: object = None
+    #: Full S01 state-machine evidence when the reference-candle strategy wins.
+    s01: object = None
 
 
 def _wick_ratio(candle, direction: str) -> float:
@@ -135,7 +138,8 @@ def _wick_ratio(candle, direction: str) -> float:
 
 
 def resolve_enabled_triggers(requested, vplr_enabled: bool, crt_enabled: bool = True,
-                             session_sweep_enabled: bool = False) -> List[str]:
+                             session_sweep_enabled: bool = False,
+                             s01_enabled: bool = False) -> List[str]:
     """
     The enabled-trigger set, with VP_LIQUIDITY_REACTION added or removed by its
     own feature switch.
@@ -171,6 +175,14 @@ def resolve_enabled_triggers(requested, vplr_enabled: bool, crt_enabled: bool = 
         if requested is not None and "SESSION_SWEEP" in names:
             raise ValueError("SESSION_SWEEP requires --session-sweep")
         names.discard("SESSION_SWEEP")
+    if s01_enabled:
+        names.add("S01_REFERENCE_CANDLE_RAID_VP")
+    else:
+        if requested is not None and "S01_REFERENCE_CANDLE_RAID_VP" in names:
+            raise ValueError(
+                "S01_REFERENCE_CANDLE_RAID_VP requested while S01 is disabled; "
+                "pass --s01 to enable it")
+        names.discard("S01_REFERENCE_CANDLE_RAID_VP")
     return sorted(names)
 
 
@@ -245,8 +257,9 @@ class SATriggerEngine:
     #: Mirrors the checks in step2_trigger, not the order of a CLI whitelist.
     #: Operator-approved 2026-09-07: Sweep first; remaining precedence intact.
     #: VP and value-area features remain disabled by default in decision_params.
-    ALL_TRIGGERS = ("SESSION_SWEEP", "SWEEP_REJECTION", "HTF_CRT_SWEEP", "VP_LIQUIDITY_REACTION", "FVG_FILL",
-                    "BOS_RETEST", "JUDAS", "VALUE_AREA_FADE")
+    ALL_TRIGGERS = ("S01_REFERENCE_CANDLE_RAID_VP", "SESSION_SWEEP", "SWEEP_REJECTION", "HTF_CRT_SWEEP",
+                    "VP_LIQUIDITY_REACTION", "FVG_FILL", "BOS_RETEST", "JUDAS",
+                    "VALUE_AREA_FADE")
 
     def __init__(self, equal_hl_tolerance_pct: float = 0.0003,
                  tp1_r: float = None, tp2_r: float = None,
@@ -274,6 +287,9 @@ class SATriggerEngine:
             m5_mss_swing_lookback=DP.MARKET_LOCATION_M5_MSS_SWING_LOOKBACK,
             acceptance_bars=DP.MARKET_LOCATION_ACCEPTANCE_BARS,
             sweep_expiry_minutes=DP.MARKET_LOCATION_SWEEP_EXPIRY_MINUTES,
+            poc_sweep_direct_entry=DP.MARKET_LOCATION_POC_SWEEP_DIRECT_ENTRY,
+            poc_zone_pad_atr=DP.MARKET_LOCATION_POC_ZONE_PAD_ATR,
+            poc_zone_pad_bins=DP.MARKET_LOCATION_POC_ZONE_PAD_BINS,
         )
         self._frozen_sweep_locations = {}
         # `step2_trigger` returns the FIRST detector that fires, in a fixed
@@ -388,6 +404,8 @@ class SATriggerEngine:
                         swept_level=trig.swept_level,
                         triggered_at=(getattr(market_location, "as_of", None)
                                      if market_location is not None else None),
+                        confirmation_frame=df_m1,
+                        sweep_time=trig.sweep_time,
                         frozen_location=frozen,
                         config=self.location_config)
                     permission = replace(permission,
@@ -432,6 +450,28 @@ class SATriggerEngine:
                 matched.append(trig.trigger_type)
                 if winner is None:
                     winner = trig
+
+        # S01 is intentionally ahead of the stateless sweep detector.  It is
+        # only present when explicitly enabled and its own state machine has
+        # already completed the reference -> raid -> MSS -> frozen-VP chain.
+        if ("S01_REFERENCE_CANDLE_RAID_VP" in self.enabled_triggers and
+                s01_result is not None and getattr(s01_result, "detected", False)):
+            sig = s01_result
+            consider(SATrigger(
+                detected=True,
+                trigger_type="S01_REFERENCE_CANDLE_RAID_VP",
+                direction=sig.direction,
+                entry_price=sig.entry_price,
+                stop_loss=sig.stop_loss,
+                tp1=sig.target,
+                tp2=sig.target,
+                confidence="HIGH",
+                description=(f"S01 {sig.direction} {sig.selected_entry_model} "
+                             "D1 reference raid -> frozen raid-leg VP -> M5 POI"),
+                swept_level=(sig.telemetry or {}).get("reference", {}).get(
+                    "reference_high" if sig.direction == "BEARISH" else "reference_low"),
+                s01=sig,
+            ))
 
         # Explicitly enabled named-session evidence precedes the local sweep.
         # With the switch off, the existing priority order is unchanged.

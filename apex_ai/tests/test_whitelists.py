@@ -80,8 +80,8 @@ class TestSessionWhitelist(unittest.TestCase):
     def test_operator_default_window_schedule(self):
         # Operator enabled all five named windows on 2026-09-08.
         for hour, minute, expected in (
-                (0, 0, "TOKYO_OPEN"), (2, 0, "IDLE"),
-                (6, 30, "PRE_LONDON"), (7, 0, "LONDON_OPEN"),
+                (0, 0, "TOKYO_OPEN"), (2, 0, "TOKYO_OPEN"),
+                (6, 0, "PRE_LONDON"), (7, 0, "LONDON_OPEN"),
                 (8, 30, "IDLE"), (12, 0, "LONDON_NY"),
                 (13, 30, "IDLE"), (16, 30, "NY_LUNCH_REV"),
                 (17, 30, "IDLE")):

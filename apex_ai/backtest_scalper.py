@@ -26,6 +26,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
 from typing import Dict, List, Optional, Tuple
 
 import MetaTrader5 as mt5
@@ -38,7 +39,7 @@ from core.manipulation_engine import ManipulationEngine
 from core.structure_engine import StructureEngine
 from intelligence.regime_engine import RegimeEngine
 from core.news_guard import NewsGuard
-from scalper.cooldown import SACooldown
+from scalper.cooldown import SACooldown, DEFAULT_WIN_COOLDOWN_MINUTES
 from scalper.ema_filter import EMABandFilter
 from scalper.sa_consultant import analyse as consult_analyse, apply_lia_override
 from scalper.sa_crg import SACRG
@@ -65,11 +66,15 @@ from scalper.candidate_funnel import (CandidateFunnelRecorder,
                                        candidate_id_for_trigger,
                                        make_candidate_id)
 from scalper.independent_outcomes import evaluate_sweep
+from scalper.regime_evidence import (CandidateEvidenceSnapshot,
+    RegimeBarSnapshot, RegimeEvidenceRecorder, candidate_id)
 from scalper.vp_liquidity_trigger import (
     VPLRParams,
     build_context as vplr_context,
     detect_with_context as vplr_detect,
+    parse_manual_levels,
 )
+from scalper.s01_reference_candle_raid_vp import S01Engine, S01Params
 import scalper.decision_params as DP
 
 # Every decision constant is imported, not restated. This block used to hold
@@ -203,6 +208,8 @@ class SimTrade:
     vp_level_source: str = ""    # PDH | SESSION_HIGH | EQUAL_HIGHS | SWING_* …
     vp_sweep_depth_atr: float = 0.0
     vp_confluences: str = ""
+    #: Full immutable S01 setup snapshot for S01 trades.
+    s01: Optional[dict] = None
     #: L-016. The sweeping candle's rejecting-wick share of its own range,
     #: stamped whether or not the filter is enabled — a baseline run has to be
     #: able to answer "how many WINNERS does this veto?" without a second arm.
@@ -212,9 +219,14 @@ class SimTrade:
     m15_fvg: Optional[dict] = None
     htf_crt: Optional[dict] = None
     session_sweep: Optional[dict] = None
+    pullback: Optional[dict] = None
+    #: Phase 1 facts-only entry identity/lifecycle telemetry.
     entry_setup_telemetry: Optional[dict] = None
+    #: Shared VP + structural S/R location snapshot at decision time.
     market_location: Optional[dict] = None
+    #: Directional permission, frozen location identity, and reaction state.
     location_permission: Optional[dict] = None
+    #: Signal-vs-fill contract, including the final blocker/permission.
     sweep_runtime_contract: Optional[dict] = None
 
 
@@ -264,6 +276,106 @@ def _sweep_runtime_record(trigger) -> dict:
         "price_drift_points": quote.get("price_drift_points"),
         "price_drift_R": quote.get("price_drift_R"),
     }
+
+
+def _s01_telemetry(row) -> dict:
+    value = getattr(row, "s01", None)
+    if not isinstance(value, dict):
+        return {}
+    return value.get("telemetry", value)
+
+
+def _s01_research_breakdown(engines: dict, trades: list[SimTrade]) -> dict:
+    """Return falsifiable S01 buckets, including candidates that never traded."""
+    candidates = []
+    for engine in engines.values():
+        candidates.extend(getattr(engine, "history", ()))
+        if getattr(engine, "setup", None) is not None:
+            current = engine.setup.record()
+            if not getattr(engine, "history", ()) or current != engine.history[-1]:
+                candidates.append(current)
+
+    s01_trades = [t for t in trades
+                  if t.trigger_type == "S01_REFERENCE_CANDLE_RAID_VP"]
+
+    def metric(rows: list[SimTrade], candidate_count: int) -> dict:
+        r_values = [float(t.r_multiple) for t in rows]
+        wins = [r for r in r_values if r > 0]
+        losses = [r for r in r_values if r < 0]
+        cumulative, peak, drawdown = 0.0, 0.0, 0.0
+        for value in r_values:
+            cumulative += value
+            peak = max(peak, cumulative)
+            drawdown = max(drawdown, peak - cumulative)
+        spread = [_s01_telemetry(t).get("spread_price") for t in rows]
+        spread = [float(v) for v in spread if v is not None]
+        distances = {
+            name: [float(_s01_telemetry(t).get(name)) for t in rows
+                   if _s01_telemetry(t).get(name) is not None]
+            for name in ("distance_to_poc", "distance_to_vah", "distance_to_val")
+        }
+        managed = [t for t in rows if t.tga_managed]
+        return {
+            "candidate_count": candidate_count,
+            "completed_trades": len(rows),
+            "win_rate_pct": round(len(wins) / len(rows) * 100.0, 2) if rows else 0.0,
+            "average_R": round(sum(r_values) / len(r_values), 6) if rows else 0.0,
+            "median_R": round(median(r_values), 6) if rows else 0.0,
+            "expectancy_R": round(sum(r_values) / len(r_values), 6) if rows else 0.0,
+            "profit_factor": round(sum(wins) / abs(sum(losses)), 6) if losses else None,
+            "maximum_drawdown_R": round(drawdown, 6),
+            "MAE_R": round(sum(t.tga_mae_r for t in managed) / len(managed), 6)
+            if managed else None,
+            "MFE_R": round(sum(t.tga_peak_r for t in managed) / len(managed), 6)
+            if managed else None,
+            "average_spread_price": round(sum(spread) / len(spread), 8)
+            if spread else None,
+            "average_entry_distance_from_POC": round(
+                sum(distances["distance_to_poc"]) / len(distances["distance_to_poc"]), 8)
+            if distances["distance_to_poc"] else None,
+            "average_entry_distance_from_VAH": round(
+                sum(distances["distance_to_vah"]) / len(distances["distance_to_vah"]), 8)
+            if distances["distance_to_vah"] else None,
+            "average_entry_distance_from_VAL": round(
+                sum(distances["distance_to_val"]) / len(distances["distance_to_val"]), 8)
+            if distances["distance_to_val"] else None,
+        }
+
+    def group_value(candidate: dict, dimension: str) -> str:
+        reference = candidate.get("reference", {})
+        if dimension == "entry_type":
+            return candidate.get("selected_entry_model") or "UNSELECTED"
+        if dimension == "raid_type":
+            return reference.get("liquidity_side") or "UNKNOWN"
+        if dimension == "session":
+            return candidate.get("session") or "UNKNOWN"
+        if dimension == "confirmation":
+            if candidate.get("m5_entry_model"):
+                return "M15_MSS+M5+M5_FVG_OB"
+            if candidate.get("m5_mss"):
+                return "M15_MSS+M5"
+            return "M15_MSS"
+        return "UNKNOWN"
+
+    result = {}
+    for dimension in ("entry_type", "raid_type", "session", "confirmation"):
+        candidate_groups = {}
+        for candidate in candidates:
+            candidate_groups.setdefault(group_value(candidate, dimension), []).append(candidate)
+        trade_groups = {}
+        for trade in s01_trades:
+            trade_groups.setdefault(group_value(_s01_telemetry(trade), dimension), []).append(trade)
+        keys = sorted(set(candidate_groups) | set(trade_groups))
+        result[dimension] = {
+            key: metric(trade_groups.get(key, []), len(candidate_groups.get(key, [])))
+            for key in keys
+        }
+    result["order_flow"] = {
+        "NOT_REQUIRED": metric(s01_trades, len(candidates)),
+        "aligned": None,
+        "not_aligned": None,
+    }
+    return result
 
 
 def emit_incidents(all_trades, data, session_checker, path: str,
@@ -403,6 +515,7 @@ def _entry_fill_price(df_m5: "pd.DataFrame", entry_idx: int,
 
 from scalper.exit_manager import ExitOutcome, SimulatedGuardian
 from scalper.reclaim_fvg import evaluate_reclaim, entry_in_reclaim_zone
+from scalper import tracked_pullback as TP
 from scalper.m15_fvg_entry import find_fvg_entry, entry_quote_allowed
 from scalper.htf_crt import watch_crt, select_crt, crt_quote_allowed
 from scalper import session_sweep as SS
@@ -422,10 +535,32 @@ def _execution_cost(symbol, volume, bar_spread, pip_value, commission_per_lot,
     return round_trip_cost_price*info.trade_contract_size*volume
 
 
-def _order_pnl(symbol: str, direction: str, volume: float, entry: float, exit_price: float) -> float:
-    order_type = mt5.ORDER_TYPE_BUY if direction == "BULLISH" else mt5.ORDER_TYPE_SELL
+def _order_pnl(symbol: str, direction: str, volume: float, entry: float,
+               exit_price: float, symbol_info=None) -> float:
+    """PnL from the immutable pre-replay contract snapshot.
+
+    Calling MT5 once per exit made multi-month replays depend on a live IPC
+    connection hours after metadata validation. Tick value/tick size are the
+    broker's own contract terms and are sufficient for this linear FX/metal
+    replay. Unsupported or malformed contracts fail closed.
+    """
+    sign = 1. if direction == 'BULLISH' else -1.
+    if direction not in ('BULLISH', 'BEARISH'):
+        raise RuntimeError(f'Invalid replay direction for {symbol}')
+    if symbol == 'XAUUSD':
+        info = symbol_info if symbol_info is not None else mt5.symbol_info(symbol)
+        tick_size = getattr(info, 'trade_tick_size', 0.) if info else 0.
+        tick_value = getattr(info, 'trade_tick_value', 0.) if info else 0.
+        values = (volume, entry, exit_price, tick_size, tick_value)
+        if (not all(math.isfinite(value) for value in values) or volume <= 0
+                or tick_size <= 0 or tick_value <= 0):
+            raise RuntimeError(f'Invalid replay P&L contract for {symbol}')
+        return sign*(exit_price-entry)/tick_size*tick_value*volume
+    order_type = mt5.ORDER_TYPE_BUY if sign > 0 else mt5.ORDER_TYPE_SELL
     pnl = mt5.order_calc_profit(order_type, symbol, volume, entry, exit_price)
-    return float(pnl) if pnl is not None else 0.0
+    if pnl is None or not math.isfinite(pnl):
+        raise RuntimeError(f'Replay P&L unavailable for {symbol}: {mt5.last_error()}')
+    return float(pnl)
 
 
 def _pip_value(symbol: str, symbol_info=None) -> float:
@@ -561,6 +696,10 @@ def _apply_v1_council_gates(
     manipulation_engine: ManipulationEngine,
     displacement_engine: DisplacementEngine,
     liquidity_engine: LiquidityEngine,
+    evidence_recorder: Optional[RegimeEvidenceRecorder] = None,
+    evidence_now: Optional[datetime] = None,
+    evidence_session_state: str = "UNKNOWN",
+    evidence_future_m5: Optional[pd.DataFrame] = None,
 ) -> Tuple[Optional[SATrigger], str]:
     if len(df_m15_upto) < 30 or len(df_h1_upto) < 30:
         return None, "WARMUP"
@@ -578,22 +717,83 @@ def _apply_v1_council_gates(
         regime_engine       = regime_engine,
     )
 
+    def emit(regime_gate: str, veto_reason: str = "") -> None:
+        if evidence_recorder is None or evidence_now is None:
+            return
+        bar = df_m15_upto["time"].iloc[-1].isoformat()
+        prior, dwell, transition = evidence_recorder.context_for(
+            symbol, "M15", bar)
+        record = CandidateEvidenceSnapshot(
+            timestamp_utc=evidence_now.isoformat(), symbol=symbol,
+            decision_timeframe="M15", completed_bar_timestamp_utc=bar,
+            candidate_id=candidate_id(symbol, bar, trigger.trigger_type,
+                                      trigger.direction, trigger.entry_price,
+                                      trigger.stop_loss, trigger.tp1),
+            direction=trigger.direction, trigger_type=trigger.trigger_type,
+            entry_price=trigger.entry_price, stop_loss=trigger.stop_loss,
+            tp1=trigger.tp1, tp2=trigger.tp2, ict_context=consult.regime,
+            context_score=consult.regime_confidence,
+            atr_ratio=consult.atr_ratio,
+            displacement_momentum=consult.displacement_momentum_score,
+            structure_trend=consult.structure_trend,
+            manipulation_detected=consult.manipulation_detected,
+            manipulation_confidence=consult.manipulation_confidence,
+            liquidity_state=consult.price_zone,
+            statistical_context=consult.statistical_regime,
+            autocorrelation=consult.statistical_autocorrelation,
+            efficiency_ratio=consult.statistical_efficiency_ratio,
+            volatility_ratio=consult.statistical_volatility_ratio,
+            previous_regime=prior, bars_in_regime=dwell,
+            transition=transition,
+            allowed_regimes=tuple(sorted(TRIGGER_REGIME_WHITELIST.get(
+                trigger.trigger_type, ()) or ())),
+            regime_gate=regime_gate, veto_reason=veto_reason,
+            stb_state="UNKNOWN", stb_confidence="UNKNOWN",
+            displacement_gate=("PASS" if consult.displacement_confirmed else "REJECT"),
+            session_state=evidence_session_state,
+            source_bar_m5_utc=(df_m15_upto["time"].iloc[-1].isoformat()),
+            source_bar_m15_utc=(df_m15_upto["time"].iloc[-1].isoformat()),
+            source_bar_h1_utc=(df_h1_upto["time"].iloc[-1].isoformat()),
+            source_bar_h4_utc=None)
+        evidence_recorder.record(record)
+        if evidence_future_m5 is not None:
+            entry_idx = int(evidence_future_m5["time"].searchsorted(
+                pd.Timestamp(evidence_now), side="left"))
+            if entry_idx < len(evidence_future_m5):
+                exit_price, outcome, reason, close_time, _ = _schedule_exit(
+                    evidence_future_m5, entry_idx, trigger, evidence_now)
+                risk = abs(trigger.entry_price - trigger.stop_loss)
+                sign = 1.0 if trigger.direction == "BULLISH" else -1.0
+                r_multiple = ((exit_price - trigger.entry_price) * sign / risk
+                              if risk > 0 else None)
+                evidence_recorder.record_outcome(
+                    candidate_id=record.candidate_id, outcome=outcome,
+                    exit_reason=reason, close_time_utc=close_time.isoformat(),
+                    r_multiple=r_multiple)
+
     # Gate 1 — per-trigger regime whitelist.
     if consult.regime == "STRESS":
+        emit("REJECT", "CONSUL_GATE1_STRESS")
         return None, "CONSUL_GATE1_STRESS"
     allowed = TRIGGER_REGIME_WHITELIST.get(trigger.trigger_type)
     if allowed is None or consult.regime not in allowed:
+        emit("REJECT", "CONSUL_GATE1_REGIME")
         return None, "CONSUL_GATE1_REGIME"
 
     # Gate 2 — BOS_RETEST requires confirmed institutional displacement.
     if trigger.requires_displacement and not consult.displacement_confirmed:
+        emit("REJECT", "CONSUL_GATE2_DISPLACEMENT")
         return None, "CONSUL_GATE2_DISPLACEMENT"
 
     # Gate 3 — LIA macro TP2 realignment. Same helper the live agent calls.
     consult = apply_lia_override(
         consult, trigger.direction, trigger.tp1, trigger.tp2, current_price)
-    if consult.lia_tp2_override and trigger.fvg_entry is None and trigger.htf_crt is None and trigger.session_sweep is None:
+    if (consult.lia_tp2_override and trigger.fvg_entry is None
+            and trigger.htf_crt is None and trigger.session_sweep is None
+            and getattr(trigger, "s01", None) is None):
         trigger.tp2 = consult.lia_tp2_override
+
+    emit("PASS")
 
     return trigger, ""
 
@@ -631,7 +831,8 @@ def _schedule_exit(
             tp1=trigger.tp1, entry_time=entry_time, volume=volume,
             max_idx=max_idx, eod=eod,
             tp_extend_blocked=(trigger.fvg_entry is not None or trigger.htf_crt is not None
-                               or trigger.session_sweep is not None))
+                               or trigger.session_sweep is not None
+                               or getattr(trigger, "s01", None) is not None))
         return (outcome.exit_price, outcome.result, outcome.exit_reason,
                 outcome.close_time, outcome)
 
@@ -679,7 +880,7 @@ def run_backtest(
     daily_loss_limit_usd: float = 50.0,
     commission_per_lot: float = 0.0,
     cooldown_enabled: bool = True,
-    win_cooldown_minutes: float = 5.0,
+    win_cooldown_minutes: float = DEFAULT_WIN_COOLDOWN_MINUTES,
     loss_cooldown_policy: str = "NEXT_UTC_HOUR",
     allow_whole_day: bool = False,
     enabled_triggers: Optional[List[str]] = None,
@@ -706,14 +907,19 @@ def run_backtest(
     vplr_enabled: bool = VPLR_ENABLED,
     vplr_session_override: bool = VPLR_SESSION_OVERRIDE_ENABLED,
     vplr_scope: str = VPLR_SCOPE,
+    vplr_manual_levels=(),
+    vplr_manual_expiry: Optional[datetime] = None,
     fill_at_next_bar_open: bool = FILL_AT_NEXT_BAR_OPEN,
     incidents_path: Optional[str] = None,
     crt_confluence_mode: str = DP.CRT_CONFLUENCE_MODE,
     round_trip_cost_price: Optional[float] = None,
     watch_inactive_crt: bool = True,
     session_sweep_enabled: bool = False,
+    s01_enabled: bool = DP.S01_ENABLED,
+    tracked_pullback_enabled: bool = False,
     historical_data: Optional[Dict[str, Dict[str, pd.DataFrame]]] = None,
     historical_symbol_info: Optional[Dict[str, object]] = None,
+    evidence_recorder: Optional[RegimeEvidenceRecorder] = None,
     candidate_funnel: Optional[CandidateFunnelRecorder] = None,
     sweep_location_policy: Optional[SweepLocationPolicy] = None,
     sweep_research_path: Optional[str] = None,
@@ -734,7 +940,8 @@ def run_backtest(
     # SWEEP_REJECTION in step2_trigger's first-match priority order.
     trigger_engine = SATriggerEngine(
         enabled_triggers=resolve_enabled_triggers(enabled_triggers,
-                                                  vplr_enabled, htf_crt_enabled, session_sweep_enabled),
+                                                  vplr_enabled, htf_crt_enabled,
+                                                  session_sweep_enabled, s01_enabled),
         sweep_wick_filter=sweep_wick_filter,
         sweep_wick_ratio=sweep_wick_ratio)
     if "SWEEP_REJECTION" in trigger_engine.enabled_triggers:
@@ -759,8 +966,20 @@ def run_backtest(
         logging.getLogger("TGA").setLevel(logging.WARNING)
         guardian = SimulatedGuardian()
     vplr_params = VPLRParams.from_decision_params(DP)
-    vp_window = (VPLR_SESSION_WINDOW_UTC
-                 if (vplr_enabled and vplr_session_override) else None)
+    vplr_manual_levels = tuple(vplr_manual_levels or ())
+    if vplr_manual_levels:
+        if not vplr_enabled or vplr_manual_expiry is None:
+            raise ValueError("manual VP levels require VPLR and an expiry")
+        if vplr_manual_expiry <= dt_from:
+            vplr_enabled = False
+            vplr_manual_levels = ()
+            trigger_engine.enabled_triggers.discard("VP_LIQUIDITY_REACTION")
+            vp_window = None
+        else:
+            vp_window = (dt_from.time(), vplr_manual_expiry.time())
+    else:
+        vp_window = (VPLR_SESSION_WINDOW_UTC
+                     if (vplr_enabled and vplr_session_override) else None)
     # Mirrors ScalperAgent's --sessions whitelist (invariant #2).
     session_checker = SASessionChecker(allow_whole_day=allow_whole_day,
                                        enabled_sessions=enabled_sessions,
@@ -903,7 +1122,7 @@ def run_backtest(
         # Decisions are only scored inside the requested window; the lead-in
         # exists to feed the gates, not to generate trades.
         start_ts = pd.Timestamp(dt_from)
-        if reclaim_fvg_enabled or m15_fvg_entry_enabled or htf_crt_enabled or session_sweep_enabled:
+        if reclaim_fvg_enabled or m15_fvg_entry_enabled or htf_crt_enabled or session_sweep_enabled or tracked_pullback_enabled:
             # A return confirmed at :05/:10 must be observable, not postponed
             # to the next M15 bar when it is stale. The trigger frame remains
             # M15; only the decision clock follows completed M5 confirmations.
@@ -949,9 +1168,13 @@ def run_backtest(
     daily_pnl = 0.0
     consecutive_losses = 0
     reclaim_last_closes = {}
+    pullbacks = TP.Book()
     crt_used = set()
     crt_watch = Counter()
     crt_candidates = []
+    s01_engines = ({str(sym).upper(): S01Engine(
+                        str(sym), S01Params.from_decision_params(DP))
+                    for sym in symbols} if s01_enabled else {})
 
     def flush_exits(upto: datetime) -> None:
         nonlocal balance, daily_pnl, consecutive_losses
@@ -976,6 +1199,45 @@ def run_backtest(
         # HTF rows are filtered by calendar close inside the shared evaluator.
         frames = data[symbol]
         info = symbol_info_by_symbol[symbol]
+        if evidence_recorder is not None and i > 0:
+            closed_m15 = frames["M15"].iloc[max(0, i - TRIGGER_BARS):i]
+            closed_h1 = _closed(frames["H1"], now, CONSULT_HTF_BARS)
+            if len(closed_m15) >= 30 and len(closed_h1) >= 30:
+                consult = consult_analyse(
+                    symbol, closed_m15, closed_h1,
+                    structure_engine=structure_engine,
+                    displacement_engine=displacement_engine,
+                    liquidity_engine=liquidity_engine,
+                    manipulation_engine=manipulation_engine,
+                    regime_engine=regime_engine)
+                source = lambda key: (frames[key][frames[key]["time"] < now]["time"].iloc[-1].isoformat()
+                                      if not frames[key][frames[key]["time"] < now].empty else None)
+                evidence_recorder.record_bar(RegimeBarSnapshot(
+                    timestamp_utc=now.isoformat(), symbol=symbol,
+                    decision_timeframe="M15",
+                    completed_bar_timestamp_utc=closed_m15["time"].iloc[-1].isoformat(),
+                    ict_context=consult.regime,
+                    context_score=consult.regime_confidence,
+                    atr_ratio=consult.atr_ratio,
+                    displacement_momentum=consult.displacement_momentum_score,
+                    structure_trend=consult.structure_trend,
+                    manipulation_detected=consult.manipulation_detected,
+                    manipulation_confidence=consult.manipulation_confidence,
+                    liquidity_state=consult.price_zone,
+                    statistical_context=consult.statistical_regime,
+                    autocorrelation=consult.statistical_autocorrelation,
+                    efficiency_ratio=consult.statistical_efficiency_ratio,
+                    volatility_ratio=consult.statistical_volatility_ratio,
+                    source_bar_m5_utc=source("M5"),
+                    source_bar_m15_utc=source("M15"), source_bar_h1_utc=source("H1"),
+                    source_bar_h4_utc=source("H4")))
+        if tracked_pullback_enabled:
+            qi = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side='left'))
+            q = float(frames['M5'].iloc[qi]['open']) if qi < len(frames['M5']) else None
+            spread_price = float(spread_by_symbol[symbol].iloc[i-1])*info.point*10.
+            pullbacks.advance(symbol, frames['M15'].iloc[max(0,i-TRIGGER_BARS):i],
+                frames['M5'].iloc[max(0,qi-CONFIRM_BARS):qi], now,
+                q, q+spread_price if q is not None else None)
         crt_plan = None
         if htf_crt_enabled and (watch_inactive_crt or not enforce_session_windows
                 or session_checker.get_state(now).in_window
@@ -1107,7 +1369,11 @@ def run_backtest(
         # anchored profile built over a forming H4 bar would repaint (L-007).
         vplr_ctx = None
         # Mirrors _scan_symbol's scope test exactly (invariant #2).
-        if vplr_enabled and (vplr_scope == "ALL_SESSIONS" or vp_only_bar):
+        manual_vp_active = (bool(vplr_manual_levels)
+                            and vplr_manual_expiry is not None
+                            and now < vplr_manual_expiry)
+        if vplr_enabled and (manual_vp_active
+                             or vplr_scope == "ALL_SESSIONS" or vp_only_bar):
             vplr_ctx = vplr_context(
                 _closed_tf(frames['H4'], now, VPLR_PROFILE_FETCH_BARS, 240),
                 symbol, vplr_params,
@@ -1115,6 +1381,9 @@ def run_backtest(
                 htf_trend=stb_filter._htf_trend(
                     symbol, _closed_tf(frames['H1'], now, HTF_BARS, 60), None),
             )
+            if manual_vp_active:
+                vplr_ctx = replace(vplr_ctx,
+                                   manual_levels=vplr_manual_levels)
 
         session_plan = None
         if session_sweep_enabled and not vp_only_bar and symbol == "XAUUSD":
@@ -1137,6 +1406,27 @@ def run_backtest(
                     reclaim_last_closes, symbol)
                 if not m15_fvg_plan.allow and m15_fvg_plan.reason != "M15_FVG_WAIT_PRICE":
                     rejects[m15_fvg_plan.reason] += 1
+        s01_result = None
+        if s01_enabled and not vp_only_bar:
+            quote_idx = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side="left"))
+            if quote_idx < len(frames["M5"]):
+                quote = float(frames["M5"].iloc[quote_idx]["open"])
+                s01_spread_price = float(spread_by_symbol[symbol].iloc[i - 1]) * info.point * 10.0
+                s01_result = s01_engines[symbol].step(
+                    df_m15_upto, df_m5_upto,
+                    _closed_tf(frames.get("D1"), now, PDR_BARS, 1440),
+                    current_price=quote,
+                    spread_price=s01_spread_price,
+                    min_stop_distance=float(getattr(info, "trade_stops_level", 0)) * info.point,
+                    now=now,
+                    session=session_checker.vp_window_name(now),
+                )
+                if candidate_funnel is not None:
+                    candidate_funnel.observe_s01(
+                        s01_result, symbol,
+                        completed_bar_ts=df_m15_upto["time"].iloc[-1],
+                        evaluation_ts=now,
+                    )
         if vp_only_bar:
             saved_triggers = trigger_engine.enabled_triggers
             trigger_engine.enabled_triggers = {"VP_LIQUIDITY_REACTION"}
@@ -1151,9 +1441,12 @@ def run_backtest(
                 vplr_ctx=vplr_ctx, m15_fvg_entry=m15_fvg_plan,
                 htf_crt=crt_plan if not vp_only_bar else None,
                 session_sweep=session_plan,
+                candidate_filter=(lambda t: pullbacks.filter_candidate(symbol, t, df_m15_upto, now))
+                    if tracked_pullback_enabled else None,
                 candidate_observer=funnel_seen.append,
                 market_location=market_location,
                 market_location_mode=market_location_mode,
+                s01_result=s01_result,
                 sweep_location_active=sweep_location_policy.active,
                 location_context_builder=(lambda t: build_sweep_location_context(
                     symbol=symbol, trigger=t, df_trigger=df_m15_upto, liquidity=liq,
@@ -1168,6 +1461,16 @@ def run_backtest(
             if vp_only_bar:
                 trigger_engine.enabled_triggers = saved_triggers
 
+        if tracked_pullback_enabled:
+            qi = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side='left'))
+            if qi >= len(frames['M5']):
+                rejects['NO_M5_BAR'] += 1
+                continue
+            q = float(frames['M5'].iloc[qi]['open'])
+            spread_price = float(spread_by_symbol[symbol].iloc[i-1])*info.point*10.
+            pullbacks.advance(symbol, df_m15_upto, df_m5_upto, now, q, q+spread_price)
+            trigger = pullbacks.select(symbol, trigger, q, q+spread_price, now,
+                {'VP_LIQUIDITY_REACTION'} if vp_only_bar else trigger_engine.enabled_triggers)
         if not trigger.detected:
             if candidate_funnel is not None and funnel_seen:
                 completed_bar = df_m15_upto["time"].iloc[-1]
@@ -1240,7 +1543,7 @@ def run_backtest(
 
         # Live reads this off the trigger frame's last bar (`df_m5` there is
         # the M15 stack under its historical variable name), so mirror that.
-        current_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt or trigger.session_sweep) else
+        current_price = (trigger.entry_price if (trigger.fvg_entry or trigger.htf_crt or trigger.session_sweep or trigger.pullback or getattr(trigger, "s01", None)) else
                          float(df_m15_upto["close"].iloc[-1]))
 
         # The broker's own spread for the bar being decided on, rather than one
@@ -1248,7 +1551,7 @@ def run_backtest(
         # settled quote — the same bar `current_price` comes from.
         bar_spread = float(spread_by_symbol[symbol].iloc[i - 1])
 
-        if reclaim_fvg_enabled and trigger.session_sweep is None:
+        if TP.legacy_required(reclaim_fvg_enabled, tracked_pullback_enabled, trigger):
             gate_idx = int(m5_index[symbol].searchsorted(pd.Timestamp(now), side="left"))
             if gate_idx >= len(frames["M5"]):
                 rejects["NO_M5_BAR"] += 1
@@ -1371,6 +1674,9 @@ def run_backtest(
             _closed(frames["H1"], now, CONSULT_HTF_BARS),
             regime_engine, structure_engine, manipulation_engine,
             displacement_engine, liquidity_engine,
+            evidence_recorder=evidence_recorder, evidence_now=now,
+            evidence_session_state=session_checker.vp_window_name(now),
+            evidence_future_m5=frames["M5"],
         )
         if trigger is None:
             rejects[why] += 1
@@ -1438,6 +1744,20 @@ def run_backtest(
             if volume <= 0:
                 rejects["SESSION_SWEEP_LOT_FLOOR"] += 1
                 continue
+        if getattr(trigger, "s01", None) is not None:
+            quoted = replace(trigger, entry_price=fill_price)
+            valid, _ = trigger_engine.step3_validate(
+                quoted, bar_spread, symbol,
+                sl_pips=abs(fill_price - trigger.stop_loss) / info.point / 10.0)
+            if not valid:
+                rejects["S01_FINAL_COST_GATE"] += 1
+                rejects_by_trigger[f"S01_FINAL_COST_GATE:{ttype}"] += 1
+                continue
+            volume = min(volume, _calc_volume(symbol, risk_usd,
+                                               fill_price, trigger.stop_loss, info))
+            if volume <= 0:
+                rejects["S01_LOT_FLOOR"] += 1
+                continue
         fvg_plan = trigger.htf_crt or trigger.fvg_entry
         quote_guard = ((lambda p, q: crt_quote_allowed(p, q, now))
                        if trigger.htf_crt else entry_quote_allowed)
@@ -1452,14 +1772,31 @@ def run_backtest(
             if not valid:
                 rejects[f"{family}_FINAL_COST_GATE"] += 1
                 continue
-        if (reclaim_fvg_enabled and trigger.session_sweep is None
+        if (TP.legacy_required(reclaim_fvg_enabled, tracked_pullback_enabled, trigger)
                 and not entry_in_reclaim_zone(trigger.reclaim, fill_price)):
             rejects["RECLAIM_QUOTE_MOVED"] += 1
             rejects_by_trigger[f"RECLAIM_QUOTE_MOVED:{ttype}"] += 1
             continue
 
-        # Replay the same final sweep contract as live. The M5 open is the
-        # simulated bid; BUYs execute on ask and SELLs on bid.
+        if trigger.pullback:
+            execution_price = fill_price + (bar_spread*info.point*10.
+                               if trigger.direction == 'BULLISH' else 0.)
+            if not trigger.pullback.quote_allowed(execution_price, now):
+                rejects['PULLBACK_QUOTE_MOVED'] += 1
+                continue
+            valid, _ = trigger_engine.step3_validate(replace(trigger, entry_price=execution_price),
+                bar_spread, symbol, sl_pips=abs(execution_price-trigger.stop_loss)/info.point/10.)
+            if not valid:
+                rejects['PULLBACK_FINAL_COST'] += 1
+                continue
+            volume = min(volume, _calc_volume(symbol, risk_usd, execution_price, trigger.stop_loss, info))
+            if volume <= 0 or not pullbacks.reserve(trigger.pullback.setup_id, execution_price, now):
+                rejects['PULLBACK_RESERVATION_OR_LOT'] += 1
+                continue
+
+        # Replay the same final sweep contract as live.  The M5 open is the
+        # simulated bid; BUYs execute on ask and SELLs on bid.  The original
+        # signal fields remain untouched for adverse-fill attribution.
         if trigger.trigger_type == "SWEEP_REJECTION":
             trigger.decision_time = now
             trigger.candidate_id = candidate_id_for_trigger(
@@ -1482,17 +1819,20 @@ def run_backtest(
                 location_blocker = "FINAL_LOCATION_NOT_FROZEN"
             else:
                 fill_time = frames["M5"].iloc[entry_idx]["time"]
+                post_m15 = frames["M15"].iloc[:i]
                 final_context = build_sweep_location_context(
-                    symbol=symbol, trigger=trigger,
-                    df_trigger=frames["M15"].iloc[:i], now=fill_time,
-                    df_d1=frames.get("D1"), df_h1=frames.get("H1"),
-                    df_h4=frames.get("H4"), df_w1=frames.get("W1"),
-                    policy=sweep_location_policy, point=info.point)
+                    symbol=symbol, trigger=trigger, df_trigger=post_m15,
+                    now=fill_time, df_d1=frames.get("D1"),
+                    df_h1=frames.get("H1"), df_h4=frames.get("H4"),
+                    df_w1=frames.get("W1"), policy=sweep_location_policy,
+                    point=info.point)
                 final_permission = build_location_permission(
                     market_location, direction=trigger.direction,
                     trigger_type="SWEEP_REJECTION",
                     swept_level=trigger.swept_level,
                     triggered_at=original_permission.triggered_at,
+                    confirmation_frame=frames["M5"][frames["M5"]["time"] < fill_time],
+                    sweep_time=getattr(trigger, "sweep_time", None),
                     frozen_location=original_permission.frozen)
                 final_permission = evaluate_sweep_reaction(
                     final_permission,
@@ -1554,8 +1894,9 @@ def run_backtest(
                 rejects[blocker] += 1
                 rejects_by_trigger[f"{blocker}:{ttype}"] += 1
                 continue
-            volume = min(volume, _calc_volume(
-                symbol, risk_usd, execution_price, trigger.stop_loss, info))
+            volume = min(volume, _calc_volume(symbol, risk_usd,
+                                               execution_price,
+                                               trigger.stop_loss, info))
             if volume <= 0:
                 rejects["FINAL_LOT_FLOOR"] += 1
                 rejects_by_trigger[f"FINAL_LOT_FLOOR:{ttype}"] += 1
@@ -1581,11 +1922,11 @@ def run_backtest(
             # one (price, volume) pair cannot express the result. Total volume
             # across legs equals the original, so the cost line is unchanged.
             gross = sum(_order_pnl(symbol, trigger.direction, leg.volume,
-                                   fill_price, leg.price)
+                                   fill_price, leg.price, info)
                         for leg in outcome.legs)
         else:
             gross = _order_pnl(symbol, trigger.direction, volume,
-                               fill_price, exit_price)
+                               fill_price, exit_price, info)
         pip_val = _pip_value(symbol, info)
         # Round-turn spread is paid once (buy the ask, sell the bid); commission
         # is per round-turn lot. Article 19141's model excludes both, so the
@@ -1620,18 +1961,19 @@ def run_backtest(
             m15_fvg=trigger.fvg_entry.record() if trigger.fvg_entry else None,
             htf_crt=trigger.htf_crt.record() if trigger.htf_crt else None,
             session_sweep=trigger.session_sweep.record() if trigger.session_sweep else None,
-            entry_setup_telemetry=build_entry_observation(
-                symbol=symbol, trigger=trigger, legacy_decision="ALLOWED"),
-            market_location=(trigger.market_location.record()
-                             if getattr(trigger, "market_location", None) is not None
-                             else None),
-            location_permission=(trigger.location_permission.record()
-                                 if getattr(trigger, "location_permission", None) is not None
-                                 else None),
-            sweep_runtime_contract=(_sweep_runtime_record(trigger)
-                                    if trigger.trigger_type == "SWEEP_REJECTION"
-                                    else None),
-            tga_managed=outcome is not None,
+            pullback=trigger.pullback.record() if trigger.pullback else None,
+             entry_setup_telemetry=build_entry_observation(
+                 symbol=symbol, trigger=trigger, legacy_decision="ALLOWED"),
+             market_location=(trigger.market_location.record()
+                              if getattr(trigger, "market_location", None) is not None
+                              else None),
+             location_permission=(trigger.location_permission.record()
+                                  if getattr(trigger, "location_permission", None) is not None
+                                  else None),
+             sweep_runtime_contract=(_sweep_runtime_record(trigger)
+                                     if trigger.trigger_type == "SWEEP_REJECTION"
+                                     else None),
+             tga_managed=outcome is not None,
             tga_sl_stage=(outcome.sl_stage if outcome else 0),
             tga_peak_r=round(outcome.peak_r, 4) if outcome else 0.0,
             tga_mae_r=round(outcome.adverse_r, 4) if outcome else 0.0,
@@ -1653,12 +1995,24 @@ def run_backtest(
                 trigger.vplr.sweep_depth_atr if trigger.vplr else 0.0, 3),
             vp_confluences=("+".join(trigger.vplr.confluences)
                             if trigger.vplr else ""),
+            s01=(trigger.s01.record() if getattr(trigger, "s01", None) else None),
             volume=volume,
             risk_usd=round(realised_risk, 2),
             r_multiple=round(net / realised_risk, 4) if realised_risk > 0 else 0.0,
             duration_min=int((close_time - now).total_seconds() / 60),
         )
+        if evidence_recorder is not None:
+            evidence_recorder.record_outcome(
+                candidate_id=candidate_id(
+                    symbol, df_m15_upto["time"].iloc[-1].isoformat(),
+                    trigger.trigger_type, trigger.direction,
+                    trigger.entry_price, trigger.stop_loss, trigger.tp1),
+                outcome=result, exit_reason=reason,
+                close_time_utc=close_time.isoformat(),
+                r_multiple=(net / realised_risk if realised_risk > 0 else None))
         open_trades[symbol] = {"trade": trade}
+        if trigger.trigger_type == "S01_REFERENCE_CANDLE_RAID_VP":
+            s01_engines[symbol].mark_executed(now)
         if trigger.htf_crt:
             crt_used.add(trigger.htf_crt.setup_id)
         if trigger.session_sweep:
@@ -1734,6 +2088,9 @@ def run_backtest(
             "sweep_wick_filter": sweep_wick_filter,
             "sweep_wick_ratio": sweep_wick_ratio,
             "reclaim_fvg_enabled": reclaim_fvg_enabled,
+            "tracked_pullback_enabled": tracked_pullback_enabled,
+            "tracked_pullback_funnel": dict(pullbacks.counts),
+            "tracked_pullback_setups": [s.record() for s in pullbacks.setups.values()],
             "m15_fvg_entry_enabled": m15_fvg_entry_enabled,
             "htf_crt_enabled": htf_crt_enabled,
             "session_sweep_enabled": session_sweep_enabled,
@@ -1745,6 +2102,7 @@ def run_backtest(
             "crt_watch_observations": dict(crt_watch),
             "crt_candidate_observations": crt_candidates,
             "vplr_enabled": vplr_enabled,
+            "s01_enabled": s01_enabled,
             "vplr_session_override": vplr_session_override,
             "vplr_scope": vplr_scope,
             "vplr_session_window_utc": [str(VPLR_SESSION_WINDOW_UTC[0]),
@@ -1788,6 +2146,8 @@ def run_backtest(
         "leg_conf_labels": dict(leg_conf_labels),
         "leg_conf_admitted": dict(leg_conf_admitted),
         "rejections_by_trigger": dict(sorted(rejects_by_trigger.items(), key=lambda kv: -kv[1])),
+        "s01_breakdown": (_s01_research_breakdown(s01_engines, all_trades)
+                          if s01_enabled else {}),
         "equity_curve": equity_curve,
         "trades": [asdict(t) for t in all_trades],
     }
@@ -1856,6 +2216,8 @@ def main() -> None:
                         help="L-016: require the sweeping candle's wick to be "
                              "at least --sweep-wick-ratio of its own range "
                              "before SWEEP_REJECTION is admitted")
+    parser.add_argument('--tracked-pullback', action='store_true',
+                        help='Third research arm: persistent break/POI/M5 rejection')
     parser.add_argument("--reclaim-fvg", action=argparse.BooleanOptionalAction,
                         default=DP.RECLAIM_FVG_ENABLED,
                         help="Require displacement reclaim plus FVG return at broken "
@@ -1890,6 +2252,11 @@ def main() -> None:
                              "anchored H4 volume-profile level confirmed by an "
                              "M5 MSS. Highest trigger priority. "
                              "Mirrors scalper_agent.py.")
+    parser.add_argument("--s01", dest="s01",
+                        action=argparse.BooleanOptionalAction,
+                        default=DP.S01_ENABLED,
+                        help="Enable S01_REFERENCE_CANDLE_RAID_VP. Mirrors "
+                             "scalper_agent.py and uses the same state engine.")
     parser.add_argument("--vplr-session-override", dest="vplr_session_override",
                         action=argparse.BooleanOptionalAction,
                         default=VPLR_SESSION_OVERRIDE_ENABLED,
@@ -1901,6 +2268,10 @@ def main() -> None:
                         help="ASIA_ONLY: evaluate VP_LIQUIDITY_REACTION only "
                              "inside the VP allowance. ALL_SESSIONS: evaluate "
                              "it on every scanned bar. Mirrors scalper_agent.py.")
+    parser.add_argument("--manual-vp-levels", default="",
+                        help="Operator profile levels, e.g. POC=4331,VAL=4314")
+    parser.add_argument("--manual-vp-expiry", default="",
+                        help="Timezone-aware ISO expiry for manual VP levels")
     parser.add_argument("--ema-band-mode", type=str, default=EMA_BAND_MODE,
                         choices=["TREND", "FADE"],
                         help="TREND: above the band permits longs (the "
@@ -1921,13 +2292,16 @@ def main() -> None:
     parser.add_argument("--commission-per-lot", type=float, default=0.0)
     parser.add_argument("--loss-limit", type=float, default=100.0)
     parser.add_argument("--no-cooldown", action="store_true")
-    parser.add_argument("--win-cooldown-min", type=float, default=5.0)
+    parser.add_argument("--win-cooldown-min", type=float,
+                        default=DEFAULT_WIN_COOLDOWN_MINUTES)
     parser.add_argument("--loss-cooldown-policy", type=str, default="NEXT_UTC_HOUR",
                         choices=["NEXT_UTC_HOUR", "FIXED_MINUTES"])
     parser.add_argument("--allow-whole-day", action="store_true")
-    parser.add_argument("--session-sweep", action="store_true",
+    parser.add_argument("--session-sweep", action=argparse.BooleanOptionalAction,
+                        default=True,
                         help="Replay session-sweep trigger from historical M1, never the current vault CSV")
-    parser.add_argument("--triggers", type=str, default=None,
+    parser.add_argument("--triggers", type=str,
+                        default="SWEEP_REJECTION,SESSION_SWEEP,VP_LIQUIDITY_REACTION,VALUE_AREA_FADE,HTF_CRT_SWEEP,FVG_FILL,BOS_RETEST,JUDAS",
                         help="Comma-separated trigger whitelist "
                              "(SWEEP_REJECTION,FVG_FILL,BOS_RETEST,JUDAS,SESSION_SWEEP,VP_LIQUIDITY_REACTION,VALUE_AREA_FADE). "
                              "Mirrors scalper_agent.py --triggers.")
@@ -1968,6 +2342,15 @@ def main() -> None:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(f"SWEEP_REJECTION named-liquidity policy failed to load: {exc}")
 
+    try:
+        manual_vp_levels = parse_manual_levels(args.manual_vp_levels)
+        manual_vp_expiry = (datetime.fromisoformat(args.manual_vp_expiry)
+                            if args.manual_vp_expiry else None)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if bool(manual_vp_levels) != bool(manual_vp_expiry):
+        parser.error("--manual-vp-levels and --manual-vp-expiry must be supplied together")
+
     dt_from = datetime.fromisoformat(args.date_from).replace(tzinfo=timezone.utc)
     dt_to = datetime.fromisoformat(args.date_to).replace(tzinfo=timezone.utc)
     symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
@@ -1998,6 +2381,7 @@ def main() -> None:
             sweep_wick_filter=args.sweep_wick_filter,
             sweep_wick_ratio=args.sweep_wick_ratio,
             reclaim_fvg_enabled=args.reclaim_fvg,
+            tracked_pullback_enabled=args.tracked_pullback,
             m15_fvg_entry_enabled=args.m15_fvg_entry,
             htf_crt_enabled=args.htf_crt,
             session_sweep_enabled=args.session_sweep,
@@ -2005,8 +2389,11 @@ def main() -> None:
             round_trip_cost_price=args.round_trip_cost_price,
             watch_inactive_crt=args.watch_inactive_crt,
             vplr_enabled=args.vplr,
+            s01_enabled=args.s01,
             vplr_session_override=args.vplr_session_override,
             vplr_scope=args.vplr_scope,
+            vplr_manual_levels=manual_vp_levels,
+            vplr_manual_expiry=manual_vp_expiry,
             vp_poc_band_frac=args.vp_poc_band,
             stb_relax_continuation=args.stb_relax,
             commission_per_lot=args.commission_per_lot,

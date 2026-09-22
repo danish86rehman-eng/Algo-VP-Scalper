@@ -43,6 +43,8 @@ STAGES = (
     "COOLDOWN",             # post-trade pause
     "DEDUP",                # symbol already has an open position
     "NO_TRIGGER",           # nothing detected — the common case, counted for a denominator
+    "PULLBACK_RECOVERY_UNAVAILABLE",
+    "PULLBACK_QUOTE_STALE",
     "EMA_BAND",             # H1 EMA(18) band veto (off by default)
     "STB",                  # short-term-bias gate
     "THIN_LIQ",             # thin-liquidity hours need HIGH confidence

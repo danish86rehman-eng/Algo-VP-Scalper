@@ -9,7 +9,7 @@ Policy (owner-specified):
             until 12:00 — the rule is deliberately "until the hour turns",
             not "for N minutes", so the pause length varies with how late in
             the hour the loss happened.
-    WIN  -> block new entries for a short fixed break (default 5 minutes).
+    WIN  -> block new entries for a short fixed break (default 15 minutes).
 
 Why this shape: the loss branch forces the agent to sit out the remainder of
 the hourly candle it just lost in, which is the smallest unit of "let the
@@ -33,6 +33,7 @@ logger = logging.getLogger("SA.Cooldown")
 
 LOSS_POLICY_NEXT_UTC_HOUR = "NEXT_UTC_HOUR"
 LOSS_POLICY_FIXED_MINUTES = "FIXED_MINUTES"
+DEFAULT_WIN_COOLDOWN_MINUTES = 15.0
 
 
 @dataclass
@@ -48,7 +49,7 @@ class SACooldown:
 
     def __init__(
         self,
-        win_minutes: float = 5.0,
+        win_minutes: float = DEFAULT_WIN_COOLDOWN_MINUTES,
         loss_policy: str = LOSS_POLICY_NEXT_UTC_HOUR,
         loss_minutes: float = 60.0,
         enabled: bool = True,

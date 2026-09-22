@@ -160,9 +160,9 @@ class TestSharedConstants(unittest.TestCase):
         from scalper.trigger_engine import resolve_enabled_triggers
         self.assertEqual(
             set(resolve_enabled_triggers(None, False, crt_enabled=False)),
-            {"SWEEP_REJECTION", "FVG_FILL", "BOS_RETEST", "JUDAS",
+        {"SWEEP_REJECTION", "FVG_FILL", "BOS_RETEST", "JUDAS",
              "VALUE_AREA_FADE"})
-        self.assertFalse(DP.VPLR_ENABLED)
+        self.assertTrue(DP.VPLR_ENABLED)
 
     def test_vp_gate_is_mirrored_into_the_simulator(self):
         """Both decision paths must contain the gate, or neither."""

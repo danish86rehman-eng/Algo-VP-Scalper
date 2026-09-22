@@ -45,11 +45,13 @@ class TriggerPriorityTests(unittest.TestCase):
     def test_shared_engine_and_disabled_volume_profile_defaults(self):
         self.assertIs(live.SATriggerEngine, SATriggerEngine)
         self.assertIs(sim.SATriggerEngine, SATriggerEngine)
-        self.assertFalse(DP.VPLR_ENABLED)
-        self.assertFalse(DP.VA_FADE_ENABLED)
+        self.assertTrue(DP.VPLR_ENABLED)
+        self.assertTrue(DP.VA_FADE_ENABLED)
         for fn in (live.ScalperAgent.__init__, sim.run_backtest):
             params = inspect.signature(fn).parameters
-            self.assertFalse(params["vplr_enabled"].default)
-            self.assertFalse(params["va_fade_enabled"].default)
+            self.assertTrue(params["vplr_enabled"].default)
+            self.assertTrue(params["va_fade_enabled"].default)
         self.assertEqual(tuple(t for t in SATriggerEngine.ALL_TRIGGERS
-                               if t not in {"VP_LIQUIDITY_REACTION", "VALUE_AREA_FADE", "SESSION_SWEEP"}), self.ORDER)
+                               if t not in {"S01_REFERENCE_CANDLE_RAID_VP",
+                                             "VP_LIQUIDITY_REACTION", "VALUE_AREA_FADE",
+                                             "SESSION_SWEEP"}), self.ORDER)

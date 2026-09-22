@@ -1,0 +1,594 @@
+{
+  "schema": "SA_REGIME_EVIDENCE_REPLAY_V1",
+  "observations": 23864,
+  "market_bar_statistics": {
+    "observations": 13204,
+    "counts": {
+      "MANIPULATION": 12192,
+      "EXPANSION": 284,
+      "TRANSITION": 688,
+      "ROTATION": 40
+    },
+    "percent": {
+      "MANIPULATION": 92.33565586186005,
+      "EXPANSION": 2.150863374734929,
+      "TRANSITION": 5.210542259921236,
+      "ROTATION": 0.3029385034837928
+    },
+    "dwell": {
+      "MANIPULATION": {
+        "median": 32,
+        "mean": 47.43968871595331,
+        "p90": 104
+      },
+      "EXPANSION": {
+        "median": 2,
+        "mean": 2.704761904761905,
+        "p90": 5
+      },
+      "TRANSITION": {
+        "median": 4.0,
+        "mean": 4.095238095238095,
+        "p90": 4
+      },
+      "ROTATION": {
+        "median": 2.0,
+        "mean": 2.2222222222222223,
+        "p90": 4
+      }
+    },
+    "transitions": {
+      "EXPANSION->MANIPULATION": 93,
+      "EXPANSION->TRANSITION": 12,
+      "MANIPULATION->EXPANSION": 99,
+      "MANIPULATION->ROTATION": 8,
+      "MANIPULATION->TRANSITION": 149,
+      "ROTATION->MANIPULATION": 11,
+      "ROTATION->TRANSITION": 7,
+      "TRANSITION->EXPANSION": 6,
+      "TRANSITION->MANIPULATION": 152,
+      "TRANSITION->ROTATION": 10
+    },
+    "transitions_per_100_bars": 4.142684035140866
+  },
+  "candidate_statistics": {
+    "EXPANSION x BOS_RETEST": {
+      "candidates": 22,
+      "passes": 10,
+      "rejects": 12,
+      "pass_rate": 0.45454545454545453
+    },
+    "EXPANSION x FVG_FILL": {
+      "candidates": 4,
+      "passes": 4,
+      "rejects": 0,
+      "pass_rate": 1.0
+    },
+    "EXPANSION x JUDAS": {
+      "candidates": 72,
+      "passes": 0,
+      "rejects": 72,
+      "pass_rate": 0.0
+    },
+    "MANIPULATION x BOS_RETEST": {
+      "candidates": 3836,
+      "passes": 0,
+      "rejects": 3836,
+      "pass_rate": 0.0
+    },
+    "MANIPULATION x FVG_FILL": {
+      "candidates": 212,
+      "passes": 212,
+      "rejects": 0,
+      "pass_rate": 1.0
+    },
+    "MANIPULATION x JUDAS": {
+      "candidates": 873,
+      "passes": 873,
+      "rejects": 0,
+      "pass_rate": 1.0
+    },
+    "ROTATION x BOS_RETEST": {
+      "candidates": 17,
+      "passes": 0,
+      "rejects": 17,
+      "pass_rate": 0.0
+    },
+    "ROTATION x JUDAS": {
+      "candidates": 2,
+      "passes": 2,
+      "rejects": 0,
+      "pass_rate": 1.0
+    },
+    "TRANSITION x BOS_RETEST": {
+      "candidates": 216,
+      "passes": 0,
+      "rejects": 216,
+      "pass_rate": 0.0
+    },
+    "TRANSITION x FVG_FILL": {
+      "candidates": 9,
+      "passes": 0,
+      "rejects": 9,
+      "pass_rate": 0.0
+    },
+    "TRANSITION x JUDAS": {
+      "candidates": 67,
+      "passes": 0,
+      "rejects": 67,
+      "pass_rate": 0.0
+    }
+  },
+  "causal_forward_outcomes": {
+    "records": 5330,
+    "joined_records": 5330,
+    "unlabelled_candidates": 0,
+    "by_regime_trigger_outcome": {
+      "EXPANSION x BOS_RETEST x LOSS": 12,
+      "EXPANSION x BOS_RETEST x TIMEOUT": 3,
+      "EXPANSION x BOS_RETEST x WIN_TP1": 7,
+      "EXPANSION x FVG_FILL x LOSS": 3,
+      "EXPANSION x FVG_FILL x WIN_TP1": 1,
+      "EXPANSION x JUDAS x EOD": 10,
+      "EXPANSION x JUDAS x LOSS": 6,
+      "EXPANSION x JUDAS x TIMEOUT": 46,
+      "EXPANSION x JUDAS x WIN_TP1": 10,
+      "MANIPULATION x BOS_RETEST x EOD": 237,
+      "MANIPULATION x BOS_RETEST x LOSS": 2406,
+      "MANIPULATION x BOS_RETEST x TIMEOUT": 141,
+      "MANIPULATION x BOS_RETEST x WIN_TP1": 1052,
+      "MANIPULATION x FVG_FILL x EOD": 2,
+      "MANIPULATION x FVG_FILL x LOSS": 146,
+      "MANIPULATION x FVG_FILL x TIMEOUT": 4,
+      "MANIPULATION x FVG_FILL x WIN_TP1": 60,
+      "MANIPULATION x JUDAS x EOD": 74,
+      "MANIPULATION x JUDAS x LOSS": 140,
+      "MANIPULATION x JUDAS x TIMEOUT": 601,
+      "MANIPULATION x JUDAS x WIN_TP1": 58,
+      "ROTATION x BOS_RETEST x EOD": 4,
+      "ROTATION x BOS_RETEST x LOSS": 13,
+      "ROTATION x JUDAS x EOD": 2,
+      "TRANSITION x BOS_RETEST x EOD": 15,
+      "TRANSITION x BOS_RETEST x LOSS": 139,
+      "TRANSITION x BOS_RETEST x TIMEOUT": 6,
+      "TRANSITION x BOS_RETEST x WIN_TP1": 56,
+      "TRANSITION x FVG_FILL x LOSS": 8,
+      "TRANSITION x FVG_FILL x WIN_TP1": 1,
+      "TRANSITION x JUDAS x EOD": 10,
+      "TRANSITION x JUDAS x LOSS": 4,
+      "TRANSITION x JUDAS x TIMEOUT": 48,
+      "TRANSITION x JUDAS x WIN_TP1": 5
+    },
+    "by_gate_and_regime": {
+      "PASS x EXPANSION": {
+        "n": 14,
+        "win_rate": 0.35714285714285715,
+        "timeout_rate": 0.07142857142857142,
+        "mean_r": 0.104628533766341
+      },
+      "PASS x MANIPULATION": {
+        "n": 1085,
+        "win_rate": 0.10875576036866359,
+        "timeout_rate": 0.5576036866359447,
+        "mean_r": 0.02335226458130725
+      },
+      "PASS x ROTATION": {
+        "n": 2,
+        "win_rate": 0.0,
+        "timeout_rate": 0.0,
+        "mean_r": -0.16999930595433443
+      },
+      "REJECT x EXPANSION": {
+        "n": 84,
+        "win_rate": 0.15476190476190477,
+        "timeout_rate": 0.5714285714285714,
+        "mean_r": 0.2793720093934401
+      },
+      "REJECT x MANIPULATION": {
+        "n": 3836,
+        "win_rate": 0.27424400417101147,
+        "timeout_rate": 0.0367570385818561,
+        "mean_r": -0.05340874567333687
+      },
+      "REJECT x ROTATION": {
+        "n": 17,
+        "win_rate": 0.0,
+        "timeout_rate": 0.0,
+        "mean_r": -0.612771295966833
+      },
+      "REJECT x TRANSITION": {
+        "n": 292,
+        "win_rate": 0.21232876712328766,
+        "timeout_rate": 0.18493150684931506,
+        "mean_r": -0.03135015780399105
+      }
+    }
+  },
+  "integrity": {
+    "missing_bar_snapshots": 0,
+    "duplicate_snapshots": 0,
+    "conflicting_snapshots": 0,
+    "orphan_candidate_records": 0,
+    "candidate_bar_regime_mismatches": 0,
+    "malformed_numeric_fields": 0,
+    "fold_timestamp_overlap": 0,
+    "authoritative_unique_bars": 13204,
+    "candidate_records": 5330
+  },
+  "ict_vs_statistical_contingency": {
+    "EXPANSION x RANGING": 217,
+    "EXPANSION x TRENDING_DOWN": 11,
+    "EXPANSION x TRENDING_UP": 13,
+    "EXPANSION x VOLATILE": 43,
+    "MANIPULATION x RANGING": 10222,
+    "MANIPULATION x TRENDING_DOWN": 568,
+    "MANIPULATION x TRENDING_UP": 451,
+    "MANIPULATION x VOLATILE": 951,
+    "ROTATION x RANGING": 21,
+    "ROTATION x TRENDING_UP": 3,
+    "ROTATION x VOLATILE": 16,
+    "TRANSITION x RANGING": 544,
+    "TRANSITION x TRENDING_DOWN": 41,
+    "TRANSITION x TRENDING_UP": 21,
+    "TRANSITION x VOLATILE": 82
+  },
+  "folds": {
+    "development_60": {
+      "observations": 11117,
+      "regimes": {
+        "observations": 7922,
+        "counts": {
+          "MANIPULATION": 7332,
+          "EXPANSION": 159,
+          "TRANSITION": 415,
+          "ROTATION": 16
+        },
+        "percent": {
+          "MANIPULATION": 92.55238576117142,
+          "EXPANSION": 2.0070689219893967,
+          "TRANSITION": 5.238576117142136,
+          "ROTATION": 0.20196919969704621
+        },
+        "dwell": {
+          "MANIPULATION": {
+            "median": 36,
+            "mean": 49.87755102040816,
+            "p90": 104
+          },
+          "EXPANSION": {
+            "median": 3,
+            "mean": 2.789473684210526,
+            "p90": 5
+          },
+          "TRANSITION": {
+            "median": 4,
+            "mean": 4.368421052631579,
+            "p90": 4
+          },
+          "ROTATION": {
+            "median": 2,
+            "mean": 2.2857142857142856,
+            "p90": 4
+          }
+        },
+        "transitions": {
+          "EXPANSION->MANIPULATION": 51,
+          "EXPANSION->TRANSITION": 6,
+          "MANIPULATION->EXPANSION": 55,
+          "MANIPULATION->ROTATION": 4,
+          "MANIPULATION->TRANSITION": 87,
+          "ROTATION->MANIPULATION": 5,
+          "ROTATION->TRANSITION": 2,
+          "TRANSITION->EXPANSION": 2,
+          "TRANSITION->MANIPULATION": 90,
+          "TRANSITION->ROTATION": 3
+        },
+        "transitions_per_100_bars": 3.8500378692249435
+      },
+      "trigger_regime_admission": {
+        "EXPANSION x BOS_RETEST": {
+          "candidates": 12,
+          "passes": 5,
+          "rejects": 7,
+          "pass_rate": 0.4166666666666667
+        },
+        "EXPANSION x FVG_FILL": {
+          "candidates": 3,
+          "passes": 3,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "EXPANSION x JUDAS": {
+          "candidates": 38,
+          "passes": 0,
+          "rejects": 38,
+          "pass_rate": 0.0
+        },
+        "MANIPULATION x BOS_RETEST": {
+          "candidates": 2275,
+          "passes": 0,
+          "rejects": 2275,
+          "pass_rate": 0.0
+        },
+        "MANIPULATION x FVG_FILL": {
+          "candidates": 143,
+          "passes": 143,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "MANIPULATION x JUDAS": {
+          "candidates": 535,
+          "passes": 535,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "ROTATION x BOS_RETEST": {
+          "candidates": 9,
+          "passes": 0,
+          "rejects": 9,
+          "pass_rate": 0.0
+        },
+        "ROTATION x JUDAS": {
+          "candidates": 2,
+          "passes": 2,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "TRANSITION x BOS_RETEST": {
+          "candidates": 126,
+          "passes": 0,
+          "rejects": 126,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x FVG_FILL": {
+          "candidates": 6,
+          "passes": 0,
+          "rejects": 6,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x JUDAS": {
+          "candidates": 46,
+          "passes": 0,
+          "rejects": 46,
+          "pass_rate": 0.0
+        }
+      }
+    },
+    "validation_20": {
+      "observations": 3735,
+      "regimes": {
+        "observations": 2641,
+        "counts": {
+          "MANIPULATION": 2425,
+          "EXPANSION": 75,
+          "TRANSITION": 133,
+          "ROTATION": 8
+        },
+        "percent": {
+          "MANIPULATION": 91.82127981825067,
+          "EXPANSION": 2.839833396440742,
+          "TRANSITION": 5.0359712230215825,
+          "ROTATION": 0.3029155622870125
+        },
+        "dwell": {
+          "MANIPULATION": {
+            "median": 36,
+            "mean": 42.54385964912281,
+            "p90": 90
+          },
+          "EXPANSION": {
+            "median": 3,
+            "mean": 2.7777777777777777,
+            "p90": 5
+          },
+          "TRANSITION": {
+            "median": 4.0,
+            "mean": 3.6944444444444446,
+            "p90": 4
+          },
+          "ROTATION": {
+            "median": 2.0,
+            "mean": 2,
+            "p90": 3
+          }
+        },
+        "transitions": {
+          "EXPANSION->MANIPULATION": 24,
+          "EXPANSION->TRANSITION": 3,
+          "MANIPULATION->EXPANSION": 25,
+          "MANIPULATION->ROTATION": 1,
+          "MANIPULATION->TRANSITION": 30,
+          "ROTATION->MANIPULATION": 1,
+          "ROTATION->TRANSITION": 3,
+          "TRANSITION->EXPANSION": 2,
+          "TRANSITION->MANIPULATION": 31,
+          "TRANSITION->ROTATION": 3
+        },
+        "transitions_per_100_bars": 4.657326770162817
+      },
+      "trigger_regime_admission": {
+        "EXPANSION x BOS_RETEST": {
+          "candidates": 3,
+          "passes": 1,
+          "rejects": 2,
+          "pass_rate": 0.3333333333333333
+        },
+        "EXPANSION x JUDAS": {
+          "candidates": 25,
+          "passes": 0,
+          "rejects": 25,
+          "pass_rate": 0.0
+        },
+        "MANIPULATION x BOS_RETEST": {
+          "candidates": 797,
+          "passes": 0,
+          "rejects": 797,
+          "pass_rate": 0.0
+        },
+        "MANIPULATION x FVG_FILL": {
+          "candidates": 33,
+          "passes": 33,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "MANIPULATION x JUDAS": {
+          "candidates": 168,
+          "passes": 168,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "ROTATION x BOS_RETEST": {
+          "candidates": 4,
+          "passes": 0,
+          "rejects": 4,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x BOS_RETEST": {
+          "candidates": 51,
+          "passes": 0,
+          "rejects": 51,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x FVG_FILL": {
+          "candidates": 1,
+          "passes": 0,
+          "rejects": 1,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x JUDAS": {
+          "candidates": 12,
+          "passes": 0,
+          "rejects": 12,
+          "pass_rate": 0.0
+        }
+      }
+    },
+    "test_20": {
+      "observations": 3682,
+      "regimes": {
+        "observations": 2641,
+        "counts": {
+          "MANIPULATION": 2435,
+          "TRANSITION": 140,
+          "EXPANSION": 50,
+          "ROTATION": 16
+        },
+        "percent": {
+          "MANIPULATION": 92.19992427110942,
+          "TRANSITION": 5.301022340022719,
+          "EXPANSION": 1.8932222642938281,
+          "ROTATION": 0.605831124574025
+        },
+        "dwell": {
+          "MANIPULATION": {
+            "median": 28,
+            "mean": 44.27272727272727,
+            "p90": 118
+          },
+          "TRANSITION": {
+            "median": 4,
+            "mean": 3.7837837837837838,
+            "p90": 5
+          },
+          "EXPANSION": {
+            "median": 2,
+            "mean": 2.380952380952381,
+            "p90": 5
+          },
+          "ROTATION": {
+            "median": 2,
+            "mean": 2.2857142857142856,
+            "p90": 4
+          }
+        },
+        "transitions": {
+          "EXPANSION->MANIPULATION": 18,
+          "EXPANSION->TRANSITION": 3,
+          "MANIPULATION->EXPANSION": 19,
+          "MANIPULATION->ROTATION": 3,
+          "MANIPULATION->TRANSITION": 32,
+          "ROTATION->MANIPULATION": 5,
+          "ROTATION->TRANSITION": 2,
+          "TRANSITION->EXPANSION": 2,
+          "TRANSITION->MANIPULATION": 31,
+          "TRANSITION->ROTATION": 4
+        },
+        "transitions_per_100_bars": 4.50586898901931
+      },
+      "trigger_regime_admission": {
+        "EXPANSION x BOS_RETEST": {
+          "candidates": 7,
+          "passes": 4,
+          "rejects": 3,
+          "pass_rate": 0.5714285714285714
+        },
+        "EXPANSION x FVG_FILL": {
+          "candidates": 1,
+          "passes": 1,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "EXPANSION x JUDAS": {
+          "candidates": 9,
+          "passes": 0,
+          "rejects": 9,
+          "pass_rate": 0.0
+        },
+        "MANIPULATION x BOS_RETEST": {
+          "candidates": 764,
+          "passes": 0,
+          "rejects": 764,
+          "pass_rate": 0.0
+        },
+        "MANIPULATION x FVG_FILL": {
+          "candidates": 36,
+          "passes": 36,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "MANIPULATION x JUDAS": {
+          "candidates": 170,
+          "passes": 170,
+          "rejects": 0,
+          "pass_rate": 1.0
+        },
+        "ROTATION x BOS_RETEST": {
+          "candidates": 4,
+          "passes": 0,
+          "rejects": 4,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x BOS_RETEST": {
+          "candidates": 39,
+          "passes": 0,
+          "rejects": 39,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x FVG_FILL": {
+          "candidates": 2,
+          "passes": 0,
+          "rejects": 2,
+          "pass_rate": 0.0
+        },
+        "TRANSITION x JUDAS": {
+          "candidates": 9,
+          "passes": 0,
+          "rejects": 9,
+          "pass_rate": 0.0
+        }
+      }
+    }
+  },
+  "forward_outcomes": {
+    "status": "LABELED_CANDIDATE_POPULATION",
+    "reason": "Each recorded candidate was shadow-replayed forward on later M5 bars; labels are observational and do not alter admission or execution."
+  },
+  "verdict": "KEEP_CURRENT_REGIME",
+  "verdict_basis": {
+    "interpretation": "The whitelist remains directionally useful: rejected MANIPULATION candidates have negative mean R while passed MANIPULATION candidates are slightly positive. This is shadow evidence, not a profitability claim.",
+    "pass_vs_reject_mean_r": {
+      "pass": 0.02403452128205129,
+      "reject": -0.047524251057950544
+    }
+  }
+}

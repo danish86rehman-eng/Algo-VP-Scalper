@@ -22,8 +22,8 @@ UTC = timezone.utc
 NY = ZoneInfo("America/New_York")
 WINDOWS = {"ASIA": (time(19), time(22)), "LONDON": (time(2), time(5)),
            "NEW_YORK": (time(8, 20), time(11))}
-EXPECTED_LOGIN = 172783529
-EXPECTED_SERVER = "Exness-MT5Real2"
+EXPECTED_LOGIN = 40280210
+EXPECTED_SERVER = "Exness-MT5Trial2"
 DEFAULT_VAULT = r"D:\OneDrive - Orient Petroleum\Personal\Obsidian\AI-Trading-Strategies"
 MAX_LEDGER_AGE = timedelta(minutes=45)
 EVENT_LIFE = timedelta(minutes=60)

@@ -21,6 +21,7 @@ apex_ai/logs/
 apex_ai/data/*.db
 apex_ai/data/*.db-shm
 apex_ai/data/*.db-wal
+apex_ai/data/tracked_pullback/
 
 # Backtest outputs
 apex_ai/backtest_results*.json

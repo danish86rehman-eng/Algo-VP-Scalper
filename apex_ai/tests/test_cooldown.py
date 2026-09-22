@@ -4,9 +4,10 @@ Cooldown switch — behavioural tests.
 The owner-specified contract:
     loss at 11:15 UTC -> blocked until 12:00 UTC
     loss at 11:55 UTC -> blocked until 12:00 UTC
-    win               -> blocked for 5 minutes
+    win               -> blocked for 15 minutes
 """
 import sys
+import inspect
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scalper.cooldown import SACooldown, LOSS_POLICY_FIXED_MINUTES
+from scalper_agent import ScalperAgent
 
 
 def utc(h, m, s=0):
@@ -59,12 +61,27 @@ class TestLossCooldown(unittest.TestCase):
 
 
 class TestWinCooldown(unittest.TestCase):
-    def test_win_blocks_five_minutes(self):
+    def test_win_blocks_fifteen_minutes(self):
         cd = SACooldown()
         cd.record_trade_result(+8.0, now=utc(11, 15))
-        self.assertEqual(cd.active_until, utc(11, 20))
-        self.assertFalse(cd.can_enter(utc(11, 19, 59)))
-        self.assertTrue(cd.can_enter(utc(11, 20)))
+        self.assertEqual(cd.active_until, utc(11, 30))
+        self.assertFalse(cd.can_enter(utc(11, 29, 59)))
+        self.assertTrue(cd.can_enter(utc(11, 30)))
+
+    def test_win_is_still_blocked_at_fourteen_minutes_fifty_nine_seconds(self):
+        cd = SACooldown()
+        close_time = utc(11, 15)
+        cd.record_trade_result(+8.0, now=close_time)
+        self.assertFalse(cd.can_enter(close_time + timedelta(minutes=14,
+                                                              seconds=59)))
+
+    def test_win_expires_exactly_fifteen_minutes_after_close(self):
+        cd = SACooldown()
+        close_time = utc(11, 15, 37)
+        cd.record_trade_result(+8.0, now=close_time)
+        self.assertFalse(cd.can_enter(close_time + timedelta(minutes=15) -
+                                      timedelta(microseconds=1)))
+        self.assertTrue(cd.can_enter(close_time + timedelta(minutes=15)))
 
     def test_win_break_is_configurable(self):
         cd = SACooldown(win_minutes=12)
@@ -75,7 +92,7 @@ class TestWinCooldown(unittest.TestCase):
         """A win late in the hour must NOT inherit the loss rule."""
         cd = SACooldown()
         cd.record_trade_result(+4.0, now=utc(11, 58))
-        self.assertEqual(cd.active_until, utc(12, 3))
+        self.assertEqual(cd.active_until, utc(12, 13))
 
 
 class TestSwitchAndLifecycle(unittest.TestCase):
@@ -101,6 +118,15 @@ class TestSwitchAndLifecycle(unittest.TestCase):
         self.assertFalse(cd.can_enter(utc(11, 52)))
         self.assertEqual(cd.active_until, utc(12, 0))
 
+    def test_restore_reapplies_active_win_pause_from_close_time(self):
+        cd = SACooldown()
+        close_time = utc(11, 15, 37)
+        cd.restore(last_close_time=close_time, last_pnl=6.0,
+                   now=close_time + timedelta(minutes=14, seconds=59))
+        self.assertFalse(cd.can_enter(close_time + timedelta(minutes=14,
+                                                              seconds=59)))
+        self.assertTrue(cd.can_enter(close_time + timedelta(minutes=15)))
+
     def test_restore_ignores_expired_pause(self):
         cd = SACooldown()
         cd.restore(last_close_time=utc(11, 50), last_pnl=-6.0, now=utc(13, 5))
@@ -123,6 +149,16 @@ class TestSwitchAndLifecycle(unittest.TestCase):
         self.assertTrue(state.active)
         self.assertEqual(state.remaining_seconds, 1800)
         self.assertIn("LOSS", state.reason)
+
+
+class TestCooldownEntryOrdering(unittest.TestCase):
+    def test_cooldown_blocks_before_trigger_detection(self):
+        """A setup seen during cooldown cannot be queued for later execution."""
+        source = inspect.getsource(ScalperAgent._scan_symbol)
+        self.assertLess(
+            source.index("if not self.cooldown.can_enter(now):"),
+            source.index("# Step 1: Micro Liquidity"),
+        )
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ class SessionWindow:
 
 SESSION_WINDOWS = [
      SessionWindow("LONDON_OPEN", dtime(7, 0), dtime(8, 30), "Primary scalp window", 1),
-     SessionWindow("LONDON_NY", dtime(12, 0), dtime(13, 30), "Highest volatility window", 1),
+     SessionWindow("LONDON_NY", dtime(11, 00), dtime(13, 30), "Highest volatility window", 1),
      SessionWindow("PRE_LONDON", dtime(6, 0), dtime(7, 0), "Early liquidity grab", 2),
      SessionWindow("TOKYO_OPEN", dtime(0, 0), dtime(6, 0), "Tokyo Open / Asia Kill Zone", 2),
      SessionWindow("NY_LUNCH_REV", dtime(16, 30), dtime(17, 30),"Mean reversion scalps", 3), ]
@@ -89,7 +89,7 @@ DEFAULT_ENABLED_SESSIONS = ("LONDON_OPEN","LONDON_NY","PRE_LONDON","TOKYO_OPEN",
 # window set.
 WHOLE_DAY_FALLBACK = SessionWindow(
     "Whole_day", dtime(0, 0), dtime(23, 0),
-    "Full-day fallback (demo/testing only — disabled by default)", 9)
+    "Full-day fallback (demo/testing only — disabled by default)", 1)
 
 
 @dataclass

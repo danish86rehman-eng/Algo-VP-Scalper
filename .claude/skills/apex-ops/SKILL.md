@@ -74,6 +74,11 @@ Pool A spawns the Guardian as a child. Then, in a separate terminal:
 cd apex_ai && py -3.14 -E scalper_agent.py --pool 900 --risk 0.03 --symbols XAUUSD --interval 30 --loss-limit 100.0 --pool-mode FRESH --sweep-location-config config.json --market-location-mode ACTIVE
 ```
 
+The production relaunch preference is `--allow-whole-day`: include it on every
+scalper relaunch so the agent does not enter `IDLE` solely because a named
+session window ended. The watchdog's persisted `SCALPER_ARGS` must carry the
+same flag and the same production arguments.
+
 Confirm three scripts are up (Windows execution aliases show each as two PIDs
 — that is one instance):
 
@@ -155,11 +160,26 @@ are diagnostic until they clear the 60/20/20 fold test.
 
 ## Session windows (UTC)
 
-Enabled by default: Tokyo 00:00–02:00 and London/NY 12:00–13:30. Defined but
-disabled by default: Pre-London 06:30–07:00, London Open 07:00–08:30, and NY
-Lunch 16:30–17:30. An explicit `--sessions` whitelist can re-enable a named
-window for controlled research. The `Whole_day` catch-all is opt-in only
-(`--allow-whole-day`) and should stay off outside plumbing tests.
+The executable source of truth is `apex_ai/scalper/session_checker.py`; inspect
+it before reporting or launching because these are operator-controlled strategy
+settings.
+
+Current production defaults enable all five named half-open windows (start
+inclusive, end exclusive):
+
+- `TOKYO_OPEN`: 00:00–06:00
+- `PRE_LONDON`: 06:00–07:00
+- `LONDON_OPEN`: 07:00–08:30
+- `LONDON_NY`: 12:00–13:30
+- `NY_LUNCH_REV`: 16:30–17:30
+
+Without the production override, the scalper is idle during 08:30–12:00,
+13:30–16:30, and 17:30–24:00 UTC. The production relaunch override
+`--allow-whole-day` enables the 00:00–23:00 catch-all, so session gating does
+not put the live scalper into `IDLE`; cooldown, risk, news, location, and all
+other trade gates still apply. An explicit `--sessions` whitelist may narrow
+the enabled set. The trigger-scoped `vp_window` is separate and must not be
+reported as a normal session.
 
 ## Where things live
 
